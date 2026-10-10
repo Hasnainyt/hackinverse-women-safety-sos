@@ -10,6 +10,7 @@ object Constants {
     // A commercial production release would register an official UUID with the Bluetooth SIG or adopt a custom 128-bit UUID.
     val SOS_SERVICE_UUID: UUID = UUID.fromString("0000FDE1-0000-1000-8000-00805F9B34FB")
     val SOS_PARCEL_UUID: ParcelUuid = ParcelUuid(SOS_SERVICE_UUID)
+    val SOS_LEGACY_128_UUID: UUID = UUID.fromString("0000FDE1-0000-1000-8000-00805F9B34FB")
 
 
     // Legacy fallback manufacturer ID

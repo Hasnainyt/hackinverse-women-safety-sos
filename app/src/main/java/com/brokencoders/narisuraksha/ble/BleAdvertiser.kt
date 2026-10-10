@@ -207,7 +207,17 @@ class BleAdvertiser(
             return
         }
 
-        val encodedPacket = PacketCodec.encode(packet)
+        val encodedPacket = PacketCodec.encode(packet) ?: run {
+            BleDiagnosticsTracker.recordEvent(
+                "NARI_BLE_ADVERTISE_FAILURE", "Failed to encode packet", isError = true
+            )
+            synchronized(stateLock) {
+                packetBeingStarted = null
+                currentPacket = null
+            }
+            if (packet.isSos) drainPendingAcks()
+            return
+        }
         val payloadPair = buildAdvertisePayloads(encodedPacket)
 
         if (payloadPair == null) {
@@ -380,7 +390,14 @@ class BleAdvertiser(
             return
         }
 
-        val encodedPacket = PacketCodec.encode(packet)
+        val encodedPacket = PacketCodec.encode(packet) ?: run {
+            synchronized(stateLock) {
+                packetBeingStarted = null
+                currentPacket = null
+            }
+            if (packet.isSos) drainPendingAcks()
+            return
+        }
         val uuid = Constants.SOS_PARCEL_UUID
         val sdOverhead = serviceDataOverhead(uuid)
         val required = AD_FLAGS_SIZE + sdOverhead + encodedPacket.size
@@ -472,7 +489,7 @@ class BleAdvertiser(
     // Queue drain
     // ---------------------------------------------------------------------
     private fun drainPendingAcks() {
-        val next: SosPacket? = synchronized(stateLock) {
+        val next = synchronized(stateLock) {
             pendingAcks.removeFirstOrNull()
         } ?: return
 

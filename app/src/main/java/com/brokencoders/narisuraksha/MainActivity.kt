@@ -130,7 +130,7 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         if(PermissionHelper.hasBluetoothPermissions(this))
         {
-            lifecycleScore.launch{
+            lifecycleScope.launch{
                 val enabled = app.preferencesRepository.isGuardianScanEnabled.first()
                 if(enabled)
                 {

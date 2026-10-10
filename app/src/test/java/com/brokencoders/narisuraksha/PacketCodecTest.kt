@@ -19,7 +19,7 @@ class PacketCodecTest {
             flags = SosPacket.FLAG_SOS.toByte()
         )
 
-        val encoded = PacketCodec.encode(original)
+        val encoded = PacketCodec.encode(original)!!
         // 1 magic + 1 version + 2 sender + 4 timestamp + 4 lat + 4 lon + 1 flags = 17 bytes
         assertEquals(17, encoded.size)
         assertEquals(0x53.toByte(), encoded[0]) // Magic byte 'S'
@@ -82,7 +82,7 @@ class PacketCodecTest {
             timestampSeconds = 1600000000
         )
 
-        val encoded = PacketCodec.encode(packet)
+        val encoded = PacketCodec.encode(packet)!!
         assertEquals(17, encoded.size)
         val decoded = PacketCodec.decode(encoded)
 
@@ -106,7 +106,7 @@ class PacketCodecTest {
         org.junit.Assert.assertFalse(testPacket.isSos)
         org.junit.Assert.assertFalse(testPacket.isAck)
 
-        val encoded = PacketCodec.encode(testPacket)
+        val encoded = PacketCodec.encode(testPacket)!!
         assertEquals(17, encoded.size)
         val decoded = PacketCodec.decode(encoded)
 
