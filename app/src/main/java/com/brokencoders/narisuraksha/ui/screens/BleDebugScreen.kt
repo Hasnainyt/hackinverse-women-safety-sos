@@ -79,6 +79,9 @@ fun BleDebugScreen(
     val acksSent by viewModel.bleDiagnostics.acksSentCount.collectAsState()
     val acksReceived by viewModel.bleDiagnostics.acksReceivedCount.collectAsState()
     val rejectedPackets by viewModel.bleDiagnostics.rejectedPacketsCount.collectAsState()
+    val relayed by viewModel.bleDiagnostics.relayedCount.collectAsState()
+    val duplicatesDropped by viewModel.bleDiagnostics.duplicatesDroppedCount.collectAsState()
+    val lastReceivedTtl by viewModel.bleDiagnostics.lastReceivedTtl.collectAsState()
     val debugScanMode by viewModel.bleDiagnostics.debugScanModeEnabled.collectAsState()
     val logs by viewModel.bleDiagnostics.logs.collectAsState()
     val isTestBroadcasting by viewModel.isTestBroadcasting.collectAsState()
@@ -252,13 +255,12 @@ fun BleDebugScreen(
                             CounterBadge("ACKs Sent", acksSent, VigilanceAmber)
                             CounterBadge("ACKs Recv", acksReceived, SafeGreen)
                         }
-                        if (rejectedPackets > 0) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "Rejected / Cooldown Packets: $rejectedPackets",
-                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                color = TextMuted
-                            )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            CounterBadge("Relayed", relayed, GuardianBlue)
+                            CounterBadge("Dup Dropped", duplicatesDropped, VigilanceAmber)
+                            CounterBadge("Last TTL", lastReceivedTtl?.toString() ?: "--", SafeGreen)
+                            CounterBadge("Cooldown Drops", rejectedPackets, TextMuted)
                         }
                     }
                 }
@@ -351,6 +353,29 @@ fun BleDebugScreen(
                             color = TextMuted,
                             modifier = Modifier.padding(top = 6.dp)
                         )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Inject Simulated SOS for Emulator Testing
+                        OutlinedButton(
+                            onClick = { viewModel.injectSimulatedSosPacket() },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth().height(42.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Sensors,
+                                contentDescription = null,
+                                tint = GuardianBlue,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "INJECT SIMULATED SOS (EMULATOR TEST)",
+                                fontWeight = FontWeight.Bold,
+                                color = GuardianBlue,
+                                fontSize = 12.sp
+                            )
+                        }
 
                         Spacer(modifier = Modifier.height(14.dp))
 
@@ -516,6 +541,11 @@ private fun StatusRow(label: String, value: String, isOk: Boolean) {
 
 @Composable
 private fun CounterBadge(label: String, count: Int, color: Color) {
+    CounterBadge(label = label, valueText = count.toString(), color = color)
+}
+
+@Composable
+private fun CounterBadge(label: String, valueText: String, color: Color) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
@@ -524,7 +554,7 @@ private fun CounterBadge(label: String, count: Int, color: Color) {
             .padding(horizontal = 10.dp, vertical = 6.dp)
     ) {
         Text(
-            text = count.toString(),
+            text = valueText,
             style = MaterialTheme.typography.titleMedium.copy(
                 fontWeight = FontWeight.Black,
                 fontFamily = FontFamily.Monospace
