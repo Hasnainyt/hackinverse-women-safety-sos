@@ -1,7 +1,9 @@
 package com.brokencoders.narisuraksha.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,33 +22,31 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.automirrored.outlined.VolumeOff
+import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.FlashlightOn
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.LocalPolice
-import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.People
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Vibration
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.FlashlightOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,31 +57,43 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.brokencoders.narisuraksha.R
+import com.brokencoders.narisuraksha.data.EmergencyContactEntity
 import com.brokencoders.narisuraksha.ui.components.AppBottomBar
-import com.brokencoders.narisuraksha.ui.components.AppCard
 import com.brokencoders.narisuraksha.ui.components.CountdownOverlay
-import com.brokencoders.narisuraksha.ui.components.DangerAppButton
-import com.brokencoders.narisuraksha.ui.components.PrimaryAppButton
-import com.brokencoders.narisuraksha.ui.components.SecondaryAppButton
+import com.brokencoders.narisuraksha.ui.components.InfoCard
+import com.brokencoders.narisuraksha.ui.components.PrimaryButton
+import com.brokencoders.narisuraksha.ui.components.SecondaryButton
 import com.brokencoders.narisuraksha.ui.components.SettingsDialog
-import com.brokencoders.narisuraksha.ui.components.SosPulseButton
-import com.brokencoders.narisuraksha.ui.components.StatusBadge
+import com.brokencoders.narisuraksha.ui.components.SosButton
+import com.brokencoders.narisuraksha.ui.components.StatusChip
 import com.brokencoders.narisuraksha.ui.theme.BorderDivider
 import com.brokencoders.narisuraksha.ui.theme.EmergencyRed
 import com.brokencoders.narisuraksha.ui.theme.EmergencyRedDark
-import com.brokencoders.narisuraksha.ui.theme.GuardianBlue
 import com.brokencoders.narisuraksha.ui.theme.PrimaryPink
 import com.brokencoders.narisuraksha.ui.theme.SafeGreen
 import com.brokencoders.narisuraksha.ui.theme.SoftPinkSurface
-import com.brokencoders.narisuraksha.ui.theme.TextMuted
 import com.brokencoders.narisuraksha.ui.theme.TextPrimary
 import com.brokencoders.narisuraksha.ui.theme.TextSecondary
-import com.brokencoders.narisuraksha.ui.theme.VigilanceAmber
+import com.brokencoders.narisuraksha.ui.theme.WarningAmber
 import com.brokencoders.narisuraksha.ui.viewmodels.MainViewModel
 
+/**
+ * HomeScreen - Core hub of Nari-Suraksha.
+ *
+ * Implements the Apple/Google level design craft:
+ * 1. One obvious primary action: centered 220dp solid pink SOS button ("Hold for help").
+ * 2. StatusChips row: Bluetooth, Location, Mesh relay (On/Off).
+ * 3. Responder counter card: "0 people responding", turns Safe Green with check icon when ACKs arrive.
+ * 4. Secondary button: "Call primary contact" (2dp pink border, 64dp).
+ * 5. Active SOS state: "Help is being alerted. Stay calm.", broadcasting indicator (Emergency Red used ONLY here),
+ *    mesh explanation line, and large 64dp "I'm safe" button.
+ */
 @Composable
 fun HomeScreen(
     viewModel: MainViewModel,
@@ -93,7 +105,7 @@ fun HomeScreen(
     onNavigateToBleDebug: () -> Unit,
     onNavigateToAlert: (senderId: Short, lat: Float, lon: Float, rssi: Int) -> Unit
 ) {
-    androidx.compose.runtime.LaunchedEffect(Unit) {
+    LaunchedEffect(Unit) {
         viewModel.ensureGuardianScanActive()
     }
 
@@ -108,7 +120,7 @@ fun HomeScreen(
     val latestAlert by viewModel.latestReceivedAlert.collectAsState()
     val isFlashlightOn by viewModel.isFlashlightOn.collectAsState()
     val isSirenOn by viewModel.isSirenOn.collectAsState()
-    val emergencyContacts by viewModel.emergencyContacts.collectAsState()
+    val primaryContact by viewModel.primaryContact.collectAsState()
 
     var isSettingsOpen by remember { mutableStateOf(false) }
 
@@ -139,101 +151,18 @@ fun HomeScreen(
                     .padding(horizontal = 20.dp, vertical = 20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Header Bar (Calm, trustworthy identity)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "Nari-Suraksha",
-                                style = MaterialTheme.typography.displayLarge.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 28.sp
-                                ),
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(SafeGreen.copy(alpha = 0.15f))
-                                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                            ) {
-                                Text(
-                                    text = "OFFLINE",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp
-                                    ),
-                                    color = SafeGreen
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "Network gayab, fir bhi help alive.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = TextSecondary
-                        )
-                    }
+                // Calm, trustworthy Header Bar
+                HomeHeader(
+                    onNavigateToDecoy = onNavigateToDecoy,
+                    onNavigateToHistory = onNavigateToHistory,
+                    onOpenSettings = { isSettingsOpen = true }
+                )
 
-                    // Top utility icons: 56x56dp minimum touch target
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        IconButton(
-                            onClick = onNavigateToDecoy,
-                            modifier = Modifier
-                                .size(56.dp)
-                                .clip(CircleShape)
-                                .background(SoftPinkSurface)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Calculate,
-                                contentDescription = "Decoy Calculator",
-                                tint = PrimaryPink,
-                                modifier = Modifier.size(26.dp)
-                            )
-                        }
-                        IconButton(
-                            onClick = onNavigateToHistory,
-                            modifier = Modifier
-                                .size(56.dp)
-                                .clip(CircleShape)
-                                .background(SoftPinkSurface)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.History,
-                                contentDescription = "History",
-                                tint = PrimaryPink,
-                                modifier = Modifier.size(26.dp)
-                            )
-                        }
-                        IconButton(
-                            onClick = { isSettingsOpen = true },
-                            modifier = Modifier
-                                .size(56.dp)
-                                .clip(CircleShape)
-                                .background(SoftPinkSurface)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Settings,
-                                contentDescription = "Settings",
-                                tint = PrimaryPink,
-                                modifier = Modifier.size(26.dp)
-                            )
-                        }
-                    }
-                }
+                Spacer(modifier = Modifier.height(16.dp))
 
-                Spacer(modifier = Modifier.height(20.dp))
-
-                // Active Incoming Distress Alert Banner
+                // Incoming Distress Alert Banner (if peer detected)
                 latestAlert?.let { alert ->
-                    AppCard(
-                        backgroundColor = EmergencyRed,
-                        borderColor = EmergencyRedDark,
+                    IncomingDistressBanner(
                         onClick = {
                             onNavigateToAlert(
                                 alert.packet.senderId,
@@ -242,307 +171,57 @@ fun HomeScreen(
                                 alert.rssi
                             )
                         }
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .clip(CircleShape)
-                                    .background(Color.White.copy(alpha = 0.2f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Shield,
-                                    contentDescription = "Alert",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(28.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(14.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Nearby Distress Signal",
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 18.sp
-                                    ),
-                                    color = Color.White
-                                )
-                                Text(
-                                    text = "Tap to view estimated distance & responder tools",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = Color.White.copy(alpha = 0.9f)
-                                )
-                            }
-                        }
-                    }
+                    )
                     Spacer(modifier = Modifier.height(16.dp))
                 }
 
-                // System Status Badges
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    StatusBadge(
-                        title = if (isScanEnabled) "BLE Guardian Active" else "BLE Scanner Off",
-                        isActive = isScanEnabled,
-                        activeColor = SafeGreen
-                    )
-                    StatusBadge(
-                        title = if (isShakeEnabled) "3-Shake Sensor On" else "Shake Disabled",
-                        isActive = isShakeEnabled,
-                        activeColor = VigilanceAmber
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(28.dp))
-
-                // Stress-Proof Hero SOS Trigger Button (Center of screen, generous padding)
-                SosPulseButton(
-                    isBroadcasting = isSosActive,
-                    onClick = {
-                        if (isSosActive) {
-                            viewModel.stopSos()
-                        } else {
-                            viewModel.triggerSos()
-                        }
-                    }
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Shake indicator prompt
-                Text(
-                    text = "Tap button or shake phone 3 times in danger",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextSecondary
-                )
-
-                // Responder Acknowledgment Card
+                // If SOS is active, present the dedicated Active SOS Experience
                 if (isSosActive) {
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    AppCard(
-                        backgroundColor = if (responderAckCount > 0) SafeGreen.copy(alpha = 0.12f) else SoftPinkSurface,
-                        borderColor = if (responderAckCount > 0) SafeGreen else BorderDivider
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(44.dp)
-                                    .clip(CircleShape)
-                                    .background(if (responderAckCount > 0) SafeGreen else PrimaryPink),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = if (responderAckCount > 0) Icons.Default.CheckCircle else Icons.Default.People,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(24.dp)
-                                )
+                    ActiveSosView(
+                        responderAckCount = responderAckCount,
+                        primaryContact = primaryContact,
+                        onStopSos = { viewModel.stopSos() },
+                        onCallPrimaryContact = {
+                            primaryContact?.let { contact ->
+                                viewModel.callContact(contact.phoneNumber)
                             }
-                            Spacer(modifier = Modifier.width(14.dp))
-                            Column {
-                                Text(
-                                    text = if (responderAckCount > 0) "$responderAckCount Nearby Responder(s) Responded!" else "Broadcasting Peer-to-Peer...",
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 18.sp
-                                    ),
-                                    color = if (responderAckCount > 0) SafeGreen else PrimaryPink
-                                )
-                                Text(
-                                    text = if (responderAckCount > 0) "A nearby person acknowledged your signal." else "Transmitting continuous distress beacon over BLE radio.",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = TextSecondary
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    DangerAppButton(
-                        text = "I am safe (Stop broadcast)",
-                        onClick = { viewModel.stopSos() },
-                        modifier = Modifier.fillMaxWidth()
+                        },
+                        isSirenOn = isSirenOn,
+                        isFlashlightOn = isFlashlightOn,
+                        onToggleSiren = { viewModel.toggleSiren() },
+                        onToggleFlashlight = { viewModel.toggleFlashlight() }
                     )
-
-                    // Emergency Contacts Alert Quick Section
-                    if (emergencyContacts.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(20.dp))
-                        AppCard {
-                            Column {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "Emergency Contacts",
-                                        style = MaterialTheme.typography.titleMedium.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 18.sp
-                                        ),
-                                        color = TextPrimary
-                                    )
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(6.dp))
-                                            .background(SoftPinkSurface)
-                                            .padding(horizontal = 8.dp, vertical = 2.dp)
-                                    ) {
-                                        Text(
-                                            text = "CELLULAR BACKUP",
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 11.sp
-                                            ),
-                                            color = PrimaryPink
-                                        )
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(12.dp))
-
-                                emergencyContacts.take(2).forEach { contact ->
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 6.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = contact.name,
-                                                style = MaterialTheme.typography.titleMedium.copy(
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 18.sp
-                                                ),
-                                                color = TextPrimary
-                                            )
-                                            Text(
-                                                text = "${contact.relationship} • ${contact.phoneNumber}",
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                color = TextSecondary
-                                            )
-                                        }
-
-                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            Button(
-                                                onClick = { viewModel.callContact(contact.phoneNumber) },
-                                                colors = ButtonDefaults.buttonColors(containerColor = SafeGreen),
-                                                shape = RoundedCornerShape(14.dp),
-                                                modifier = Modifier.height(48.dp)
-                                            ) {
-                                                Icon(Icons.Default.Call, contentDescription = null, modifier = Modifier.size(18.dp))
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text("Call", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                                            }
-                                        }
-                                    }
-                                }
+                } else {
+                    // Standby Calm Home Experience
+                    StandbyHomeView(
+                        isScanEnabled = isScanEnabled,
+                        responderAckCount = responderAckCount,
+                        primaryContact = primaryContact,
+                        onTriggerSos = { viewModel.triggerSos() },
+                        onCallPrimaryContact = {
+                            if (primaryContact != null) {
+                                viewModel.callContact(primaryContact!!.phoneNumber)
+                            } else {
+                                onNavigateToContacts()
                             }
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(28.dp))
-
-                // Emergency Deterrents (Siren & Flashlight)
-                AppCard {
-                    Column {
-                        Text(
-                            text = "Emergency Deterrents",
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 20.sp
-                            ),
-                            color = TextPrimary
-                        )
-                        Spacer(modifier = Modifier.height(14.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(14.dp)
-                        ) {
-                            DeterrentToolButton(
-                                title = if (isSirenOn) "Stop Siren" else "Loud Siren",
-                                icon = if (isSirenOn) Icons.AutoMirrored.Outlined.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
-                                isActive = isSirenOn,
-                                activeColor = EmergencyRed,
-                                modifier = Modifier.weight(1f),
-                                onClick = { viewModel.toggleSiren() }
-                            )
-                            DeterrentToolButton(
-                                title = if (isFlashlightOn) "Torch Off" else "Strobe Torch",
-                                icon = if (isFlashlightOn) Icons.Outlined.FlashlightOff else Icons.Default.FlashlightOn,
-                                isActive = isFlashlightOn,
-                                activeColor = VigilanceAmber,
-                                modifier = Modifier.weight(1f),
-                                onClick = { viewModel.toggleFlashlight() }
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                // Protection Toggles Card
-                AppCard {
-                    Column {
-                        Text(
-                            text = "Offline Protection Settings",
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 20.sp
-                            ),
-                            color = TextPrimary
-                        )
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        SettingToggleRow(
-                            title = "Shake to Trigger SOS",
-                            subtitle = "3 rapid shakes (2.7g) starts 3s countdown",
-                            icon = Icons.Default.Vibration,
-                            checked = isShakeEnabled,
-                            onCheckedChange = { viewModel.setShakeDetectionEnabled(it) }
-                        )
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        SettingToggleRow(
-                            title = "Background BLE Guardian",
-                            subtitle = "Listens for distress alerts even with screen locked",
-                            icon = Icons.Default.Sensors,
-                            checked = isScanEnabled,
-                            onCheckedChange = { viewModel.setGuardianScanEnabled(it) }
-                        )
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        SettingToggleRow(
-                            title = "Decoy Calculator Mode",
-                            subtitle = "Disguise app as calculator with PIN trigger ($secretPin)",
-                            icon = Icons.Default.Calculate,
-                            checked = isDecoyEnabled,
-                            onCheckedChange = { viewModel.setDecoyModeEnabled(it) }
-                        )
-                    }
+                        },
+                        isSirenOn = isSirenOn,
+                        isFlashlightOn = isFlashlightOn,
+                        onToggleSiren = { viewModel.toggleSiren() },
+                        onToggleFlashlight = { viewModel.toggleFlashlight() },
+                        isShakeEnabled = isShakeEnabled,
+                        isDecoyEnabled = isDecoyEnabled,
+                        secretPin = secretPin,
+                        onToggleShake = { viewModel.setShakeDetectionEnabled(it) },
+                        onToggleScan = { viewModel.setGuardianScanEnabled(it) },
+                        onToggleDecoy = { viewModel.setDecoyModeEnabled(it) }
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
             }
 
-            // Countdown Overlay
+            // Full-screen Countdown Overlay (96sp number, haptic tick, 80dp cancel button)
             CountdownOverlay(
                 isCountingDown = isCountingDown,
                 remainingSeconds = countdownSeconds,
@@ -563,6 +242,561 @@ fun HomeScreen(
     }
 }
 
+/**
+ * Top App Header with identity and 56x56dp utility icon buttons.
+ */
+@Composable
+private fun HomeHeader(
+    onNavigateToDecoy: () -> Unit,
+    onNavigateToHistory: () -> Unit,
+    onOpenSettings: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Nari-Suraksha",
+                    style = MaterialTheme.typography.displayLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 28.sp
+                    ),
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(SafeGreen.copy(alpha = 0.15f))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.offline_badge),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp
+                        ),
+                        color = SafeGreen
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = stringResource(R.string.home_tagline),
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextSecondary
+            )
+        }
+
+        // 56x56dp minimum touch targets for utility controls
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            IconButton(
+                onClick = onNavigateToDecoy,
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(SoftPinkSurface)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Calculate,
+                    contentDescription = stringResource(R.string.decoy_calculator_title),
+                    tint = PrimaryPink,
+                    modifier = Modifier.size(26.dp)
+                )
+            }
+            IconButton(
+                onClick = onNavigateToHistory,
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(SoftPinkSurface)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.History,
+                    contentDescription = "History",
+                    tint = PrimaryPink,
+                    modifier = Modifier.size(26.dp)
+                )
+            }
+            IconButton(
+                onClick = onOpenSettings,
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(SoftPinkSurface)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "Settings",
+                    tint = PrimaryPink,
+                    modifier = Modifier.size(26.dp)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Incoming distress alert banner from a nearby peer.
+ */
+@Composable
+private fun IncomingDistressBanner(
+    onClick: () -> Unit
+) {
+    InfoCard(
+        backgroundColor = EmergencyRed,
+        borderColor = EmergencyRedDark,
+        onClick = onClick
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.2f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Shield,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.nearby_distress_title),
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    ),
+                    color = Color.White
+                )
+                Text(
+                    text = stringResource(R.string.nearby_distress_subtitle),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.9f)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Normal Standby View:
+ * 1. Centered 220dp SOS button ("Hold for help", solid pink, white shield icon, slow pulse ring).
+ * 2. StatusChips row: Bluetooth, Location, Mesh relay (On/Off).
+ * 3. Responder counter card: "0 people responding", turns green when ACKs arrive.
+ * 4. Secondary button: "Call primary contact".
+ */
+@Composable
+private fun StandbyHomeView(
+    isScanEnabled: Boolean,
+    responderAckCount: Int,
+    primaryContact: EmergencyContactEntity?,
+    onTriggerSos: () -> Unit,
+    onCallPrimaryContact: () -> Unit,
+    isSirenOn: Boolean,
+    isFlashlightOn: Boolean,
+    onToggleSiren: () -> Unit,
+    onToggleFlashlight: () -> Unit,
+    isShakeEnabled: Boolean,
+    isDecoyEnabled: Boolean,
+    secretPin: String,
+    onToggleShake: (Boolean) -> Unit,
+    onToggleScan: (Boolean) -> Unit,
+    onToggleDecoy: (Boolean) -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // 1. Centered 220dp solid pink SOS button with white shield icon & slow pulse ring
+        SosButton(
+            isBroadcasting = false,
+            onClick = onTriggerSos,
+            label = stringResource(R.string.hold_for_help)
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // 2. Row of StatusChips: Bluetooth, Location, Mesh relay (On/Off)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
+        ) {
+            StatusChip(
+                label = stringResource(R.string.bluetooth_status),
+                icon = Icons.Default.Bluetooth,
+                statusColor = SafeGreen
+            )
+            StatusChip(
+                label = stringResource(R.string.location_status),
+                icon = Icons.Default.LocationOn,
+                statusColor = SafeGreen
+            )
+            StatusChip(
+                label = if (isScanEnabled) stringResource(R.string.mesh_relay_on) else stringResource(R.string.mesh_relay_off),
+                icon = Icons.Default.Sensors,
+                statusColor = if (isScanEnabled) SafeGreen else WarningAmber
+            )
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // 3. Responder Counter Card: "0 people responding", turns green when ACKs arrive
+        InfoCard(
+            backgroundColor = if (responderAckCount > 0) SafeGreen.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface,
+            borderColor = if (responderAckCount > 0) SafeGreen else MaterialTheme.colorScheme.outline
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(if (responderAckCount > 0) SafeGreen else SoftPinkSurface),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (responderAckCount > 0) Icons.Default.CheckCircle else Icons.Default.People,
+                        contentDescription = null,
+                        tint = if (responderAckCount > 0) Color.White else PrimaryPink,
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(14.dp))
+                Column {
+                    Text(
+                        text = if (responderAckCount > 0) {
+                            if (responderAckCount == 1) stringResource(R.string.single_responder)
+                            else stringResource(R.string.multiple_responders, responderAckCount)
+                        } else {
+                            stringResource(R.string.zero_responders)
+                        },
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp
+                        ),
+                        color = if (responderAckCount > 0) SafeGreen else TextPrimary
+                    )
+                    Text(
+                        text = if (responderAckCount > 0) {
+                            stringResource(R.string.responder_acknowledged)
+                        } else {
+                            "Mesh standby • Peer signals monitored"
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // 4. "Call primary contact" as a secondary button (64dp tall, 2dp pink border, surface fill)
+        SecondaryButton(
+            text = if (primaryContact != null) {
+                stringResource(R.string.call_contact, primaryContact.name)
+            } else {
+                stringResource(R.string.set_primary_contact)
+            },
+            icon = Icons.Default.Call,
+            onClick = onCallPrimaryContact,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Emergency Deterrents Card (Loud Siren, Strobe Torch)
+        InfoCard {
+            Column {
+                Text(
+                    text = stringResource(R.string.emergency_deterrents),
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 18.sp
+                    ),
+                    color = TextPrimary
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    DeterrentToolButton(
+                        title = if (isSirenOn) stringResource(R.string.stop_siren) else stringResource(R.string.loud_siren),
+                        icon = if (isSirenOn) Icons.AutoMirrored.Outlined.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                        isActive = isSirenOn,
+                        activeColor = EmergencyRed,
+                        modifier = Modifier.weight(1f),
+                        onClick = onToggleSiren
+                    )
+                    DeterrentToolButton(
+                        title = if (isFlashlightOn) stringResource(R.string.torch_off) else stringResource(R.string.strobe_torch),
+                        icon = if (isFlashlightOn) Icons.Outlined.FlashlightOff else Icons.Default.FlashlightOn,
+                        isActive = isFlashlightOn,
+                        activeColor = WarningAmber,
+                        modifier = Modifier.weight(1f),
+                        onClick = onToggleFlashlight
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // Offline Protection Settings Card
+        InfoCard {
+            Column {
+                Text(
+                    text = stringResource(R.string.protection_settings),
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 18.sp
+                    ),
+                    color = TextPrimary
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                SettingToggleRow(
+                    title = stringResource(R.string.shake_detection_title),
+                    subtitle = stringResource(R.string.shake_detection_subtitle),
+                    icon = Icons.Default.Vibration,
+                    checked = isShakeEnabled,
+                    onCheckedChange = onToggleShake
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                SettingToggleRow(
+                    title = stringResource(R.string.guardian_scan_title),
+                    subtitle = stringResource(R.string.guardian_scan_subtitle),
+                    icon = Icons.Default.Sensors,
+                    checked = isScanEnabled,
+                    onCheckedChange = onToggleScan
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                SettingToggleRow(
+                    title = stringResource(R.string.decoy_calculator_title),
+                    subtitle = "PIN: $secretPin • ${stringResource(R.string.decoy_calculator_subtitle)}",
+                    icon = Icons.Default.Calculate,
+                    checked = isDecoyEnabled,
+                    onCheckedChange = onToggleDecoy
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 4. Active SOS Screen / View:
+ * Calm confirmation: "Help is being alerted. Stay calm."
+ * Broadcasting indicator (Emergency Red used ONLY here),
+ * responder count, and clear mesh explanation line:
+ * "Nearby phones are passing your alert along."
+ * Large 64dp "I'm safe" button.
+ */
+@Composable
+private fun ActiveSosView(
+    responderAckCount: Int,
+    primaryContact: EmergencyContactEntity?,
+    onStopSos: () -> Unit,
+    onCallPrimaryContact: () -> Unit,
+    isSirenOn: Boolean,
+    isFlashlightOn: Boolean,
+    onToggleSiren: () -> Unit,
+    onToggleFlashlight: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Broadcasting indicator: Emergency Red used ONLY for the live-broadcast indicator
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(32.dp))
+                .background(EmergencyRed.copy(alpha = 0.12f))
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(EmergencyRed)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = stringResource(R.string.broadcasting_sos),
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        letterSpacing = 0.8.sp
+                    ),
+                    color = EmergencyRed
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // Calm confirmation: "Help is being alerted. Stay calm."
+        Text(
+            text = stringResource(R.string.help_alerted_stay_calm),
+            style = MaterialTheme.typography.headlineMedium.copy(
+                fontWeight = FontWeight.Bold,
+                fontSize = 24.sp
+            ),
+            color = TextPrimary,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Clear mesh explanation line: "Nearby phones are passing your alert along."
+        Text(
+            text = stringResource(R.string.nearby_phones_passing_alert),
+            style = MaterialTheme.typography.bodyLarge.copy(fontSize = 18.sp),
+            color = TextSecondary,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Responder Counter Card (turns green with check icon when ACKs arrive)
+        InfoCard(
+            backgroundColor = if (responderAckCount > 0) SafeGreen.copy(alpha = 0.12f) else SoftPinkSurface,
+            borderColor = if (responderAckCount > 0) SafeGreen else BorderDivider
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(CircleShape)
+                        .background(if (responderAckCount > 0) SafeGreen else PrimaryPink),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (responderAckCount > 0) Icons.Default.CheckCircle else Icons.Default.People,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(16.dp))
+                Column {
+                    Text(
+                        text = if (responderAckCount > 0) {
+                            if (responderAckCount == 1) stringResource(R.string.single_responder)
+                            else stringResource(R.string.multiple_responders, responderAckCount)
+                        } else {
+                            stringResource(R.string.zero_responders)
+                        },
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 20.sp
+                        ),
+                        color = if (responderAckCount > 0) SafeGreen else PrimaryPink
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = if (responderAckCount > 0) {
+                            stringResource(R.string.responder_acknowledged)
+                        } else {
+                            stringResource(R.string.broadcasting_mesh_desc)
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(28.dp))
+
+        // Large 64dp "I'm safe" button (Solid Pink primary button, stopping the SOS)
+        PrimaryButton(
+            text = stringResource(R.string.im_safe),
+            icon = Icons.Default.CheckCircle,
+            onClick = onStopSos,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        // Cellular backup option if primary contact exists
+        if (primaryContact != null) {
+            Spacer(modifier = Modifier.height(14.dp))
+            SecondaryButton(
+                text = stringResource(R.string.call_contact, primaryContact.name),
+                icon = Icons.Default.Call,
+                onClick = onCallPrimaryContact,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Quick deterrent tools directly available during active emergency
+        InfoCard {
+            Column {
+                Text(
+                    text = stringResource(R.string.emergency_deterrents),
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 18.sp
+                    ),
+                    color = TextPrimary
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    DeterrentToolButton(
+                        title = if (isSirenOn) stringResource(R.string.stop_siren) else stringResource(R.string.loud_siren),
+                        icon = if (isSirenOn) Icons.AutoMirrored.Outlined.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                        isActive = isSirenOn,
+                        activeColor = EmergencyRed,
+                        modifier = Modifier.weight(1f),
+                        onClick = onToggleSiren
+                    )
+                    DeterrentToolButton(
+                        title = if (isFlashlightOn) stringResource(R.string.torch_off) else stringResource(R.string.strobe_torch),
+                        icon = if (isFlashlightOn) Icons.Outlined.FlashlightOff else Icons.Default.FlashlightOn,
+                        isActive = isFlashlightOn,
+                        activeColor = WarningAmber,
+                        modifier = Modifier.weight(1f),
+                        onClick = onToggleFlashlight
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Clean Deterrent Tool Button for Siren and Torch.
+ */
 @Composable
 private fun DeterrentToolButton(
     title: String,
@@ -587,6 +821,9 @@ private fun DeterrentToolButton(
     }
 }
 
+/**
+ * Toggle Row for settings items with clear icon, title, and accessible switch.
+ */
 @Composable
 private fun SettingToggleRow(
     title: String,
@@ -636,7 +873,7 @@ private fun SettingToggleRow(
                 checkedThumbColor = Color.White,
                 checkedTrackColor = PrimaryPink,
                 uncheckedThumbColor = Color.White,
-                uncheckedTrackColor = Color(0xFFD4B8C4)
+                uncheckedTrackColor = BorderDivider
             )
         )
     }

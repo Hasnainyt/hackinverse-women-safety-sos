@@ -21,6 +21,8 @@ private val LightColorScheme = lightColorScheme(
     onSecondary = Color.White,
     secondaryContainer = SoftPinkSurface,
     onSecondaryContainer = TextPrimary,
+    tertiary = WarningAmber,
+    onTertiary = Color.White,
     background = AppBackground,
     onBackground = TextPrimary,
     surface = CardBackground,
@@ -37,10 +39,12 @@ private val DarkColorScheme = darkColorScheme(
     onPrimary = Color.White,
     primaryContainer = DarkSoftPinkSurface,
     onPrimaryContainer = DarkTextPrimary,
-    secondary = GuardianBlue,
+    secondary = DarkGuardianBlue,
     onSecondary = Color.White,
     secondaryContainer = DarkSoftPinkSurface,
     onSecondaryContainer = DarkTextPrimary,
+    tertiary = DarkWarningAmber,
+    onTertiary = Color.White,
     background = DarkBackground,
     onBackground = DarkTextPrimary,
     surface = DarkSurface,
@@ -48,7 +52,7 @@ private val DarkColorScheme = darkColorScheme(
     surfaceVariant = DarkSoftPinkSurface,
     onSurfaceVariant = DarkTextSecondary,
     outline = DarkBorderDivider,
-    error = EmergencyRed,
+    error = DarkEmergencyRed,
     onError = Color.White
 )
 
@@ -76,6 +80,7 @@ fun NariSurakshaTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
+        shapes = Shapes,
         content = content
     )
 }

@@ -3,9 +3,7 @@ package com.brokencoders.narisuraksha.ui.components
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,34 +11,54 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.brokencoders.narisuraksha.core.Constants
+import com.brokencoders.narisuraksha.R
+import com.brokencoders.narisuraksha.ui.theme.DarkBackground
 import com.brokencoders.narisuraksha.ui.theme.EmergencyRed
-import com.brokencoders.narisuraksha.ui.theme.SoftPinkSurface
-import com.brokencoders.narisuraksha.ui.theme.TextPrimary
+import com.brokencoders.narisuraksha.ui.theme.NariSurakshaTheme
 
+/**
+ * SOS Countdown Screen
+ * Spec: Full screen, 96sp number, haptic tick per second, a huge 80dp Cancel button
+ * at the bottom. Nothing else on screen.
+ */
 @Composable
 fun CountdownOverlay(
     isCountingDown: Boolean,
     remainingSeconds: Int,
     onCancel: () -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
+
+    // Haptic tick per second
+    LaunchedEffect(remainingSeconds, isCountingDown) {
+        if (isCountingDown) {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        }
+    }
+
     AnimatedVisibility(
         visible = isCountingDown,
         enter = fadeIn(),
@@ -48,90 +66,72 @@ fun CountdownOverlay(
     ) {
         Surface(
             modifier = Modifier.fillMaxSize(),
-            color = Color(0xFF1E1218).copy(alpha = 0.96f)
+            color = DarkBackground
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(24.dp),
+                    .padding(horizontal = 24.dp, vertical = 40.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                verticalArrangement = Arrangement.SpaceBetween
             ) {
+                // Top spacer ensuring the 96sp number is vertically balanced
+                Spacer(modifier = Modifier.weight(1f))
+
+                // 96sp bold countdown display number
                 Text(
-                    text = "Distress SOS Triggered",
-                    style = MaterialTheme.typography.headlineLarge.copy(
+                    text = "$remainingSeconds",
+                    style = MaterialTheme.typography.displayLarge.copy(
+                        fontSize = 96.sp,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 26.sp
+                        lineHeight = 96.sp
                     ),
                     color = Color.White,
                     textAlign = TextAlign.Center
                 )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.weight(1f))
 
-                Text(
-                    text = "Broadcasting peer-to-peer BLE beacon in...",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = Color(0xFFD4B8C4),
-                    textAlign = TextAlign.Center
-                )
-
-                Spacer(modifier = Modifier.height(40.dp))
-
-                // Stress-proof massive countdown circle
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.size(200.dp)
-                ) {
-                    val progress = remainingSeconds.toFloat() / Constants.COUNTDOWN_DURATION_SECONDS.toFloat()
-
-                    CircularProgressIndicator(
-                        progress = { progress },
-                        modifier = Modifier.fillMaxSize(),
-                        color = EmergencyRed,
-                        trackColor = Color(0xFF3D2633),
-                        strokeWidth = 12.dp
-                    )
-
-                    Box(
-                        modifier = Modifier
-                            .size(160.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF2A1A22)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "$remainingSeconds",
-                            style = MaterialTheme.typography.displayLarge.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 84.sp,
-                                lineHeight = 84.sp
-                            ),
-                            color = EmergencyRed
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(40.dp))
-
-                Text(
-                    text = "GPS telemetry, BLE radio packet, and local audio evidence recording will activate automatically.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color(0xFFD4B8C4),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                )
-
-                Spacer(modifier = Modifier.height(48.dp))
-
-                // One primary, stress-proof action: 64dp Cancel Danger button
-                DangerAppButton(
-                    text = "I am safe (Cancel SOS)",
-                    icon = Icons.Default.Close,
+                // Huge 80dp Cancel button at the bottom (forgiving tap for shaking hands)
+                Button(
                     onClick = onCancel,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = EmergencyRed,
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(20.dp),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(80.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = stringResource(R.string.cancel_sos),
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 20.sp
+                        )
+                    )
+                }
             }
         }
+    }
+}
+
+@Preview(name = "Countdown Light", showBackground = true)
+@Composable
+private fun PreviewCountdownOverlay() {
+    NariSurakshaTheme {
+        CountdownOverlay(
+            isCountingDown = true,
+            remainingSeconds = 3,
+            onCancel = {}
+        )
     }
 }
