@@ -21,37 +21,40 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.brokencoders.narisuraksha.ui.theme.SafeGreen
+import com.brokencoders.narisuraksha.ui.theme.SoftPinkSurface
+import com.brokencoders.narisuraksha.ui.theme.TextPrimary
+import com.brokencoders.narisuraksha.ui.theme.TextSecondary
 
 @Composable
 fun StatusBadge(
     title: String,
     isActive: Boolean,
     activeColor: Color = SafeGreen,
-    inactiveColor: Color = Color.Gray,
+    inactiveColor: Color = TextSecondary,
     modifier: Modifier = Modifier
 ) {
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
-            .background(Color(0xFF242424))
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .background(SoftPinkSurface)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
     ) {
         Box(
             modifier = Modifier
-                .size(8.dp)
+                .size(10.dp)
                 .clip(CircleShape)
                 .background(if (isActive) activeColor else inactiveColor)
         )
-        Spacer(modifier = Modifier.width(6.dp))
+        Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = title,
-            style = MaterialTheme.typography.labelLarge.copy(
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold
             ),
-            color = if (isActive) Color.White else Color.LightGray
+            color = if (isActive) TextPrimary else TextSecondary
         )
     }
 }

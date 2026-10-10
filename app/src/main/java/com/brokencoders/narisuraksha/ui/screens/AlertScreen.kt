@@ -24,24 +24,22 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.automirrored.outlined.VolumeOff
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.FlashlightOn
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.SignalCellularAlt
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.FlashlightOff
-import androidx.compose.material.icons.outlined.VolumeOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -61,9 +59,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.brokencoders.narisuraksha.core.Constants
+import com.brokencoders.narisuraksha.ui.components.AppCard
+import com.brokencoders.narisuraksha.ui.components.PrimaryAppButton
+import com.brokencoders.narisuraksha.ui.components.SecondaryAppButton
 import com.brokencoders.narisuraksha.ui.theme.EmergencyRed
 import com.brokencoders.narisuraksha.ui.theme.EmergencyRedDark
+import com.brokencoders.narisuraksha.ui.theme.GuardianBlue
+import com.brokencoders.narisuraksha.ui.theme.PrimaryPink
 import com.brokencoders.narisuraksha.ui.theme.SafeGreen
+import com.brokencoders.narisuraksha.ui.theme.SoftPinkSurface
 import com.brokencoders.narisuraksha.ui.theme.TextMuted
 import com.brokencoders.narisuraksha.ui.theme.TextPrimary
 import com.brokencoders.narisuraksha.ui.theme.TextSecondary
@@ -95,20 +99,24 @@ fun AlertScreen(
                     Text(
                         text = "Distress Signal Detected",
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                        color = TextPrimary
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.size(56.dp)
+                    ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = TextPrimary
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(28.dp)
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFF181818)
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
             )
         },
@@ -122,59 +130,56 @@ fun AlertScreen(
                 .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Emergency Alert Header Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = EmergencyRedDark),
-                shape = RoundedCornerShape(20.dp)
+            // Emergency Alert Header Card (Solid Emergency Red, no gradients)
+            AppCard(
+                backgroundColor = EmergencyRed,
+                borderColor = EmergencyRedDark
             ) {
                 Column(
-                    modifier = Modifier.padding(20.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(60.dp)
+                            .size(64.dp)
                             .clip(CircleShape)
-                            .background(EmergencyRed),
+                            .background(Color.White.copy(alpha = 0.2f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.Warning,
                             contentDescription = "Emergency",
                             tint = Color.White,
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(36.dp)
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
                     Text(
                         text = "EMERGENCY SOS ACTIVE",
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            fontWeight = FontWeight.Black,
-                            fontSize = 22.sp
+                        style = MaterialTheme.typography.headlineLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 24.sp
                         ),
                         color = Color.White
                     )
 
+                    Spacer(modifier = Modifier.height(4.dp))
+
                     Text(
                         text = "Sender Anonymous ID: #$senderId",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.8f)
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Color.White.copy(alpha = 0.9f)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             // Proximity & Signal Strength Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
-                shape = RoundedCornerShape(20.dp)
-            ) {
-                Column(modifier = Modifier.padding(18.dp)) {
+            AppCard {
+                Column {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -189,77 +194,117 @@ fun AlertScreen(
                             Icon(
                                 imageVector = Icons.Default.SignalCellularAlt,
                                 contentDescription = "Signal",
-                                tint = VigilanceAmber,
-                                modifier = Modifier.size(16.dp)
+                                tint = GuardianBlue,
+                                modifier = Modifier.size(20.dp)
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = "$rssi dBm",
-                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                                color = VigilanceAmber
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                color = GuardianBlue
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
                     Text(
                         text = distanceBucket.approxDistanceText,
                         style = MaterialTheme.typography.headlineLarge.copy(
-                            fontWeight = FontWeight.ExtraBold,
-                            color = SafeGreen
-                        )
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 26.sp
+                        ),
+                        color = SafeGreen
                     )
+
+                    Spacer(modifier = Modifier.height(4.dp))
 
                     Text(
                         text = "Relative signal category: ${distanceBucket.label}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextMuted
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Primary Action: 64dp Responder ACK Button
+            Button(
+                onClick = {
+                    viewModel.sendResponderAck(senderId)
+                    isAckSent = true
+                    Toast.makeText(context, "ACK beacon transmitted! Victim's phone is notified.", Toast.LENGTH_LONG).show()
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isAckSent) SafeGreen else GuardianBlue,
+                    contentColor = Color.White
+                ),
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(64.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = if (isAckSent) Icons.Default.CheckCircle else Icons.Default.SignalCellularAlt,
+                        contentDescription = null,
+                        modifier = Modifier.size(28.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = if (isAckSent) "ACK Transmitted to Sender" else "I am responding (Send ACK)",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 18.sp
+                        )
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
 
             // GPS Coordinates Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
-                shape = RoundedCornerShape(20.dp)
-            ) {
-                Column(modifier = Modifier.padding(18.dp)) {
+            AppCard {
+                Column {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.LocationOn,
-                            contentDescription = "Location",
-                            tint = EmergencyRed,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(SoftPinkSurface),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.LocationOn,
+                                contentDescription = "Location",
+                                tint = PrimaryPink,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            text = "GPS Coordinates (Offline Captured)",
+                            text = "GPS Coordinates (Offline)",
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                             color = TextPrimary
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
                     if (hasValidLocation) {
                         Text(
-                            text = "Latitude: $lat",
-                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-                            color = TextPrimary
-                        )
-                        Text(
-                            text = "Longitude: $lon",
+                            text = "Latitude: $lat\nLongitude: $lon",
                             style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
                             color = TextPrimary
                         )
 
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
                             Button(
                                 onClick = {
                                     val geoUri = Uri.parse("geo:$lat,$lon?q=$lat,$lon(Distress+SOS+Location)")
@@ -270,120 +315,94 @@ fun AlertScreen(
                                         Toast.makeText(context, "No offline map app installed", Toast.LENGTH_SHORT).show()
                                     }
                                 },
-                                colors = ButtonDefaults.buttonColors(containerColor = SafeGreen),
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.weight(1f)
+                                colors = ButtonDefaults.buttonColors(containerColor = PrimaryPink),
+                                shape = RoundedCornerShape(16.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(56.dp)
                             ) {
-                                Icon(imageVector = Icons.Default.Map, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Icon(imageVector = Icons.Default.Map, contentDescription = null, modifier = Modifier.size(22.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text(text = "Open Maps", fontWeight = FontWeight.Bold)
+                                Text(text = "Open Maps", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                             }
 
-                            OutlinedButton(
+                            SecondaryAppButton(
+                                text = "Copy",
+                                icon = Icons.Default.ContentCopy,
                                 onClick = {
                                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                     val clip = ClipData.newPlainText("SOS Coordinates", "$lat, $lon")
                                     clipboard.setPrimaryClip(clip)
                                     Toast.makeText(context, "Coordinates copied to clipboard", Toast.LENGTH_SHORT).show()
                                 },
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(imageVector = Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(text = "Copy Coords")
-                            }
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(56.dp)
+                            )
                         }
                     } else {
                         Text(
                             text = "Sender's GPS was unavailable indoors. Track via Bluetooth proximity and RSSI signal strength.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = TextMuted
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = TextSecondary
                         )
                     }
                 }
             }
 
-            // Responder Acknowledgment Button (Stretch Option B)
-            Button(
-                onClick = {
-                    viewModel.sendResponderAck(senderId)
-                    isAckSent = true
-                    Toast.makeText(context, "ACK beacon transmitted! Victim's phone is notified.", Toast.LENGTH_LONG).show()
-                },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isAckSent) Color(0xFF1B5E20) else SafeGreen,
-                    contentColor = Color.White
-                ),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(54.dp)
-            ) {
-                Icon(
-                    imageVector = if (isAckSent) Icons.Default.Warning else Icons.Default.SignalCellularAlt,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = if (isAckSent) "✓ ACK TRANSMITTED TO SENDER" else "I AM RESPONDING (SEND ACK)",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
-            }
+            Spacer(modifier = Modifier.height(20.dp))
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Responder Tools Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
-                shape = RoundedCornerShape(20.dp)
-            ) {
-                Column(modifier = Modifier.padding(18.dp)) {
+            // Responder Assistance Tools
+            AppCard {
+                Column {
                     Text(
                         text = "Responder Assistance Tools",
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
                         color = TextPrimary
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Button(
                             onClick = { viewModel.toggleSiren() },
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isSirenOn) EmergencyRed else Color(0xFF2C2C2C),
-                                contentColor = Color.White
+                                containerColor = if (isSirenOn) EmergencyRed else SoftPinkSurface,
+                                contentColor = if (isSirenOn) Color.White else PrimaryPink
                             ),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.weight(1f)
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(56.dp)
                         ) {
                             Icon(
-                                imageVector = if (isSirenOn) Icons.Outlined.VolumeOff else Icons.Default.VolumeUp,
-                                contentDescription = null
+                                imageVector = if (isSirenOn) Icons.AutoMirrored.Outlined.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                                contentDescription = null,
+                                modifier = Modifier.size(22.dp)
                             )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(text = if (isSirenOn) "Stop Siren" else "Loud Siren")
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = if (isSirenOn) "Stop Siren" else "Loud Siren", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                         }
 
                         Button(
                             onClick = { viewModel.toggleFlashlight() },
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isFlashlightOn) VigilanceAmber else Color(0xFF2C2C2C),
-                                contentColor = Color.White
+                                containerColor = if (isFlashlightOn) VigilanceAmber else SoftPinkSurface,
+                                contentColor = if (isFlashlightOn) Color.White else PrimaryPink
                             ),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.weight(1f)
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(56.dp)
                         ) {
                             Icon(
                                 imageVector = if (isFlashlightOn) Icons.Outlined.FlashlightOff else Icons.Default.FlashlightOn,
-                                contentDescription = null
+                                contentDescription = null,
+                                modifier = Modifier.size(22.dp)
                             )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(text = if (isFlashlightOn) "Torch Off" else "Flashlight")
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = if (isFlashlightOn) "Torch Off" else "Flashlight", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }

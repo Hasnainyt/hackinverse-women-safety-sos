@@ -31,8 +31,6 @@ import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Train
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -57,10 +55,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.brokencoders.narisuraksha.ui.components.AppBottomBar
+import com.brokencoders.narisuraksha.ui.components.AppCard
+import com.brokencoders.narisuraksha.ui.components.SecondaryAppButton
 import com.brokencoders.narisuraksha.ui.theme.EmergencyRed
-import com.brokencoders.narisuraksha.ui.theme.EmergencyRedDark
 import com.brokencoders.narisuraksha.ui.theme.GuardianBlue
+import com.brokencoders.narisuraksha.ui.theme.PrimaryPink
 import com.brokencoders.narisuraksha.ui.theme.SafeGreen
+import com.brokencoders.narisuraksha.ui.theme.SoftPinkSurface
 import com.brokencoders.narisuraksha.ui.theme.TextMuted
 import com.brokencoders.narisuraksha.ui.theme.TextPrimary
 import com.brokencoders.narisuraksha.ui.theme.TextSecondary
@@ -78,7 +80,7 @@ data class SafeZone(
 
 enum class SafeZoneType(val label: String, val icon: ImageVector, val color: Color) {
     POLICE("Police Station", Icons.Default.LocalPolice, GuardianBlue),
-    WOMEN_HELP_DESK("24x7 Women Desk", Icons.Default.Security, EmergencyRed),
+    WOMEN_HELP_DESK("24x7 Women Desk", Icons.Default.Security, PrimaryPink),
     HOSPITAL("Hospital / Emergency", Icons.Default.LocalHospital, SafeGreen),
     METRO_SECURITY("Metro Station Guard", Icons.Default.Train, VigilanceAmber)
 }
@@ -118,22 +120,15 @@ val sampleSafeZones = listOf(
         address = "Gate 2, CISF Security Booth",
         lat = 28.6250,
         lon = 77.2180,
-        emergencyContact = "155370"
-    ),
-    SafeZone(
-        id = "5",
-        name = "One Stop Centre (Sakhi) for Women",
-        type = SafeZoneType.WOMEN_HELP_DESK,
-        address = "District Social Welfare Complex",
-        lat = 28.6300,
-        lon = 77.2250,
-        emergencyContact = "181"
+        emergencyContact = "1511"
     )
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SafeZoneScreen(onBack: () -> Unit) {
+fun SafeZoneScreen(
+    onBack: () -> Unit
+) {
     val context = LocalContext.current
     var selectedFilter by remember { mutableStateOf<SafeZoneType?>(null) }
 
@@ -149,19 +144,33 @@ fun SafeZoneScreen(onBack: () -> Unit) {
                     Text(
                         text = "Offline Safe Zones",
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                        color = TextPrimary
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.size(56.dp)
+                    ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = TextPrimary
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(28.dp)
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF181818))
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            )
+        },
+        bottomBar = {
+            AppBottomBar(
+                currentRoute = "safe_zones",
+                onNavigate = { route ->
+                    if (route != "safe_zones") onBack()
+                }
             )
         },
         containerColor = MaterialTheme.colorScheme.background
@@ -170,187 +179,170 @@ fun SafeZoneScreen(onBack: () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .padding(horizontal = 20.dp)
         ) {
-            // Emergency Helplines quick bar
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFF181818))
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Informational Overview Card
+            AppCard(
+                backgroundColor = SoftPinkSurface
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    EmergencyDialChip("112 All Emergency", "112", context)
-                    EmergencyDialChip("1091 Women Helpline", "1091", context)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(PrimaryPink),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.LocalPolice,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Column {
+                        Text(
+                            text = "Pre-Cached Safe Havens",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = TextPrimary
+                        )
+                        Text(
+                            text = "Verified 24x7 manned police posts, women desks, and emergency centers available offline.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextSecondary
+                        )
+                    }
                 }
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "*Note: Emergency voice calls require active cellular carrier signal.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TextMuted,
-                    fontSize = 11.sp
-                )
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Category Filter Chips
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 FilterChip(
                     selected = selectedFilter == null,
                     onClick = { selectedFilter = null },
-                    label = { Text("All") },
+                    label = { Text("All", fontWeight = FontWeight.SemiBold, fontSize = 15.sp) },
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = EmergencyRed,
-                        selectedLabelColor = Color.White
-                    )
+                        selectedContainerColor = PrimaryPink,
+                        selectedLabelColor = Color.White,
+                        containerColor = SoftPinkSurface,
+                        labelColor = TextPrimary
+                    ),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.height(44.dp)
                 )
-                FilterChip(
-                    selected = selectedFilter == SafeZoneType.WOMEN_HELP_DESK,
-                    onClick = {
-                        selectedFilter = if (selectedFilter == SafeZoneType.WOMEN_HELP_DESK) null else SafeZoneType.WOMEN_HELP_DESK
-                    },
-                    label = { Text("Women Desks") },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = EmergencyRed,
-                        selectedLabelColor = Color.White
+
+                SafeZoneType.entries.forEach { type ->
+                    FilterChip(
+                        selected = selectedFilter == type,
+                        onClick = { selectedFilter = if (selectedFilter == type) null else type },
+                        label = { Text(type.label, fontWeight = FontWeight.SemiBold, fontSize = 14.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = PrimaryPink,
+                            selectedLabelColor = Color.White,
+                            containerColor = SoftPinkSurface,
+                            labelColor = TextPrimary
+                        ),
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.height(44.dp)
                     )
-                )
-                FilterChip(
-                    selected = selectedFilter == SafeZoneType.POLICE,
-                    onClick = {
-                        selectedFilter = if (selectedFilter == SafeZoneType.POLICE) null else SafeZoneType.POLICE
-                    },
-                    label = { Text("Police") },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = GuardianBlue,
-                        selectedLabelColor = Color.White
-                    )
-                )
+                }
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+                modifier = Modifier.fillMaxSize()
             ) {
                 items(filteredZones, key = { it.id }) { zone ->
-                    SafeZoneCard(zone = zone, context = context)
-                }
-            }
-        }
-    }
-}
+                    AppCard {
+                        Column {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(CircleShape)
+                                        .background(zone.type.color.copy(alpha = 0.15f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = zone.type.icon,
+                                        contentDescription = null,
+                                        tint = zone.type.color,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(14.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = zone.name,
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 18.sp
+                                        ),
+                                        color = TextPrimary
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = zone.address,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = TextSecondary
+                                    )
+                                }
+                            }
 
-@Composable
-private fun EmergencyDialChip(title: String, number: String, context: Context) {
-    Button(
-        onClick = {
-            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$number"))
-            context.startActivity(intent)
-        },
-        colors = ButtonDefaults.buttonColors(containerColor = EmergencyRedDark),
-        shape = RoundedCornerShape(16.dp),
-        modifier = Modifier.height(36.dp)
-    ) {
-        Icon(imageVector = Icons.Default.Call, contentDescription = null, modifier = Modifier.size(14.dp))
-        Spacer(modifier = Modifier.width(4.dp))
-        Text(text = title, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-    }
-}
+                            Spacer(modifier = Modifier.height(16.dp))
 
-@Composable
-private fun SafeZoneCard(zone: SafeZone, context: Context) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(zone.type.color.copy(alpha = 0.2f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = zone.type.icon,
-                        contentDescription = null,
-                        tint = zone.type.color,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = zone.name,
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = TextPrimary
-                    )
-                    Text(
-                        text = zone.type.label,
-                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
-                        color = zone.type.color
-                    )
-                }
-            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Button(
+                                    onClick = {
+                                        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${zone.emergencyContact}"))
+                                        context.startActivity(intent)
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = SafeGreen),
+                                    shape = RoundedCornerShape(16.dp),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(56.dp)
+                                ) {
+                                    Icon(Icons.Default.Call, contentDescription = null, modifier = Modifier.size(20.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Call ${zone.emergencyContact}", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                                }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = zone.address,
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary
-            )
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Button(
-                    onClick = {
-                        val geoUri = Uri.parse("geo:${zone.lat},${zone.lon}?q=${zone.lat},${zone.lon}(${Uri.encode(zone.name)})")
-                        val mapIntent = Intent(Intent.ACTION_VIEW, geoUri)
-                        if (mapIntent.resolveActivity(context.packageManager) != null) {
-                            context.startActivity(mapIntent)
-                        } else {
-                            Toast.makeText(context, "No offline map app installed", Toast.LENGTH_SHORT).show()
+                                SecondaryAppButton(
+                                    text = "Directions",
+                                    icon = Icons.Default.Directions,
+                                    onClick = {
+                                        val geoUri = Uri.parse("geo:${zone.lat},${zone.lon}?q=${zone.lat},${zone.lon}(${Uri.encode(zone.name)})")
+                                        val mapIntent = Intent(Intent.ACTION_VIEW, geoUri)
+                                        if (mapIntent.resolveActivity(context.packageManager) != null) {
+                                            context.startActivity(mapIntent)
+                                        } else {
+                                            Toast.makeText(context, "No map application available", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(56.dp)
+                                )
+                            }
                         }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2C2C2C)),
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(imageVector = Icons.Default.Directions, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(text = "Navigate", fontSize = 13.sp)
-                }
-
-                Button(
-                    onClick = {
-                        val dialIntent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${zone.emergencyContact}"))
-                        context.startActivity(dialIntent)
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = SafeGreen),
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(imageVector = Icons.Default.Call, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(text = "Call ${zone.emergencyContact}", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }

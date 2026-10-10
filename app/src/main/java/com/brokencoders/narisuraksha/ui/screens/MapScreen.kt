@@ -37,15 +37,12 @@ import androidx.compose.material.icons.filled.Train
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -71,9 +68,15 @@ import androidx.compose.ui.unit.sp
 import com.brokencoders.narisuraksha.data.SafeZoneCategory
 import com.brokencoders.narisuraksha.data.SafeZoneItem
 import com.brokencoders.narisuraksha.data.SafeZonesRepository
+import com.brokencoders.narisuraksha.ui.components.AppBottomBar
+import com.brokencoders.narisuraksha.ui.components.AppCard
+import com.brokencoders.narisuraksha.ui.components.SecondaryAppButton
+import com.brokencoders.narisuraksha.ui.theme.BorderDivider
 import com.brokencoders.narisuraksha.ui.theme.EmergencyRed
 import com.brokencoders.narisuraksha.ui.theme.GuardianBlue
+import com.brokencoders.narisuraksha.ui.theme.PrimaryPink
 import com.brokencoders.narisuraksha.ui.theme.SafeGreen
+import com.brokencoders.narisuraksha.ui.theme.SoftPinkSurface
 import com.brokencoders.narisuraksha.ui.theme.TextMuted
 import com.brokencoders.narisuraksha.ui.theme.TextPrimary
 import com.brokencoders.narisuraksha.ui.theme.TextSecondary
@@ -98,7 +101,6 @@ fun MapScreen(
     var selectedFilter by remember { mutableStateOf<SafeZoneCategory?>(null) }
     var selectedSafeZone by remember { mutableStateOf<SafeZoneItem?>(null) }
 
-    // Fallback baseline coordinates if GPS is disabled (Center of New Delhi / Demo baseline)
     val userLat = currentCoords?.lat ?: 28.6139
     val userLon = currentCoords?.lon ?: 77.2090
     val isGpsActive = currentCoords != null
@@ -118,30 +120,55 @@ fun MapScreen(
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Map, contentDescription = null, tint = GuardianBlue, modifier = Modifier.size(22.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(SoftPinkSurface),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Map, contentDescription = null, tint = PrimaryPink, modifier = Modifier.size(20.dp))
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = "Offline Tactical Map & Radar",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = TextPrimary
+                            text = "Tactical Radar & Map",
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.size(56.dp)
+                    ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = TextPrimary
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(28.dp)
                         )
                     }
                 },
                 actions = {
-                    IconButton(onClick = { viewModel.refreshLocation() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh GPS", tint = TextPrimary)
+                    IconButton(
+                        onClick = { viewModel.refreshLocation() },
+                        modifier = Modifier.size(56.dp)
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh GPS", tint = PrimaryPink, modifier = Modifier.size(26.dp))
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF141414))
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            )
+        },
+        bottomBar = {
+            AppBottomBar(
+                currentRoute = "map",
+                onNavigate = { route ->
+                    if (route != "map") onBack()
+                }
             )
         },
         containerColor = MaterialTheme.colorScheme.background
@@ -150,8 +177,8 @@ fun MapScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
                 Spacer(modifier = Modifier.height(4.dp))
@@ -165,15 +192,10 @@ fun MapScreen(
                 )
             }
 
-            // Tactical Proximity Radar Canvas
+            // Tactical Proximity Radar Canvas Card
             item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF161616)),
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
+                AppCard {
                     Column(
-                        modifier = Modifier.padding(14.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Row(
@@ -182,21 +204,28 @@ fun MapScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "PROXIMITY RADAR (5 KM RANGE)",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                color = GuardianBlue
+                                text = "Proximity Radar (5 km)",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = TextPrimary
                             )
-                            Text(
-                                text = "100% OFFLINE BEARING",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 10.sp
-                                ),
-                                color = SafeGreen
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(SafeGreen.copy(alpha = 0.15f))
+                                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = "100% OFFLINE",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 11.sp
+                                    ),
+                                    color = SafeGreen
+                                )
+                            }
                         }
 
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
 
                         // Radar View
                         TacticalRadarView(
@@ -208,10 +237,10 @@ fun MapScreen(
                             onSelectZone = { selectedSafeZone = it },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(260.dp)
+                                .height(270.dp)
                         )
 
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
 
                         // Radar Legend
                         Row(
@@ -219,12 +248,12 @@ fun MapScreen(
                             horizontalArrangement = Arrangement.SpaceEvenly,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            LegendItem(GuardianBlue, "You")
+                            LegendItem(PrimaryPink, "You")
                             LegendItem(SafeGreen, "Hospital")
                             LegendItem(GuardianBlue, "Police")
-                            LegendItem(EmergencyRed, "Women Desk")
+                            LegendItem(PrimaryPink, "Women Desk")
                             if (latestAlert != null) {
-                                LegendItem(Color.Red, "SOS Alert")
+                                LegendItem(EmergencyRed, "SOS Alert")
                             }
                         }
                     }
@@ -235,75 +264,76 @@ fun MapScreen(
             selectedSafeZone?.let { zone ->
                 item {
                     val distKm = SafeZonesRepository.calculateDistanceKm(userLat, userLon, zone.lat, zone.lon)
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF221F28)),
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .border(1.dp, GuardianBlue, RoundedCornerShape(14.dp))
+                    AppCard(
+                        backgroundColor = SoftPinkSurface,
+                        borderColor = PrimaryPink
                     ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
+                        Column {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "SELECTED SAFE HAVEN",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                    color = GuardianBlue
+                                    text = "Selected Safe Haven",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = PrimaryPink
                                 )
                                 Text(
                                     text = SafeZonesRepository.formatDistance(distKm),
                                     style = MaterialTheme.typography.titleMedium.copy(
-                                        fontWeight = FontWeight.Black,
+                                        fontWeight = FontWeight.Bold,
                                         fontFamily = FontFamily.Monospace
                                     ),
                                     color = SafeGreen
                                 )
                             }
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
                             Text(
                                 text = zone.name,
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 18.sp
+                                ),
                                 color = TextPrimary
                             )
                             Text(
                                 text = zone.address,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = TextMuted
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = TextSecondary
                             )
-                            Spacer(modifier = Modifier.height(10.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 Button(
                                     onClick = { dialPhone(context, zone.emergencyContact) },
                                     colors = ButtonDefaults.buttonColors(containerColor = SafeGreen),
-                                    shape = RoundedCornerShape(10.dp),
-                                    modifier = Modifier.weight(1f).height(40.dp)
+                                    shape = RoundedCornerShape(16.dp),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(56.dp)
                                 ) {
-                                    Icon(Icons.Default.Call, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("DIAL ${zone.emergencyContact}", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    Icon(Icons.Default.Call, contentDescription = null, modifier = Modifier.size(20.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Call ${zone.emergencyContact}", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
                                 }
-                                OutlinedButton(
+                                SecondaryAppButton(
+                                    text = "Directions",
+                                    icon = Icons.Default.Directions,
                                     onClick = { openDirections(context, zone.lat, zone.lon, zone.name) },
-                                    shape = RoundedCornerShape(10.dp),
-                                    modifier = Modifier.weight(1f).height(40.dp)
-                                ) {
-                                    Icon(Icons.Default.Directions, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("DIRECTIONS", fontSize = 12.sp)
-                                }
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(56.dp)
+                                )
                             }
                         }
                     }
                 }
             }
 
-            // Filter Chips
+            // Category Filter Chips
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -312,21 +342,29 @@ fun MapScreen(
                     FilterChip(
                         selected = selectedFilter == null,
                         onClick = { selectedFilter = null },
-                        label = { Text("All (${safeZones.size})", fontSize = 11.sp) },
+                        label = { Text("All (${safeZones.size})", fontWeight = FontWeight.SemiBold, fontSize = 14.sp) },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = GuardianBlue,
-                            selectedLabelColor = Color.White
-                        )
+                            selectedContainerColor = PrimaryPink,
+                            selectedLabelColor = Color.White,
+                            containerColor = SoftPinkSurface,
+                            labelColor = TextPrimary
+                        ),
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.height(44.dp)
                     )
                     SafeZoneCategory.entries.forEach { cat ->
                         FilterChip(
                             selected = selectedFilter == cat,
                             onClick = { selectedFilter = if (selectedFilter == cat) null else cat },
-                            label = { Text(cat.label.take(12), fontSize = 11.sp) },
+                            label = { Text(cat.label.take(14), fontWeight = FontWeight.SemiBold, fontSize = 14.sp) },
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = GuardianBlue,
-                                selectedLabelColor = Color.White
-                            )
+                                selectedContainerColor = PrimaryPink,
+                                selectedLabelColor = Color.White,
+                                containerColor = SoftPinkSurface,
+                                labelColor = TextPrimary
+                            ),
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier.height(44.dp)
                         )
                     }
                 }
@@ -358,12 +396,8 @@ private fun LocationTelemetryCard(
     isGpsActive: Boolean,
     onOpenExternalMap: () -> Unit
 ) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
-        shape = RoundedCornerShape(14.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+    AppCard {
+        Column {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -372,31 +406,31 @@ private fun LocationTelemetryCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
-                            .size(10.dp)
+                            .size(12.dp)
                             .clip(CircleShape)
                             .background(if (isGpsActive) SafeGreen else VigilanceAmber)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (isGpsActive) "CURRENT GPS TELEMETRY" else "OFFLINE BASELINE LOCATION",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        text = if (isGpsActive) "Live GPS Telemetry" else "Offline Baseline Location",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = if (isGpsActive) SafeGreen else VigilanceAmber
                     )
                 }
 
                 Button(
                     onClick = onOpenExternalMap,
-                    colors = ButtonDefaults.buttonColors(containerColor = GuardianBlue),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.height(32.dp)
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryPink),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.height(44.dp)
                 ) {
-                    Icon(Icons.Default.MyLocation, contentDescription = null, modifier = Modifier.size(14.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("OPEN IN MAPS", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.MyLocation, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Maps", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 TelemetryParam("LATITUDE", coords?.let { String.format(Locale.US, "%.5f", it.lat) } ?: "28.61393")
@@ -414,12 +448,14 @@ private fun LocationTelemetryCard(
 @Composable
 private fun TelemetryParam(label: String, value: String) {
     Column {
-        Text(text = label, style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp), color = TextMuted)
+        Text(text = label, style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp), color = TextSecondary)
+        Spacer(modifier = Modifier.height(2.dp))
         Text(
             text = value,
-            style = MaterialTheme.typography.bodyMedium.copy(
+            style = MaterialTheme.typography.bodyLarge.copy(
                 fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace
+                fontFamily = FontFamily.Monospace,
+                fontSize = 16.sp
             ),
             color = TextPrimary
         )
@@ -438,9 +474,9 @@ private fun TacticalRadarView(
 ) {
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFF0F0F0F))
-            .border(1.dp, Color(0xFF262626), RoundedCornerShape(12.dp)),
+            .clip(RoundedCornerShape(20.dp))
+            .background(SoftPinkSurface)
+            .border(1.5.dp, BorderDivider, RoundedCornerShape(20.dp)),
         contentAlignment = Alignment.Center
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
@@ -450,13 +486,13 @@ private fun TacticalRadarView(
             // Concentric range rings: 1.25km, 2.5km, 3.75km, 5km
             val ringIntervals = listOf(0.25f, 0.5f, 0.75f, 1.0f)
             val strokeDashed = Stroke(
-                width = 1.dp.toPx(),
+                width = 1.5.dp.toPx(),
                 pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f), 0f)
             )
 
             ringIntervals.forEach { fraction ->
                 drawCircle(
-                    color = Color(0xFF263238),
+                    color = PrimaryPink.copy(alpha = 0.25f),
                     radius = maxRadius * fraction,
                     center = center,
                     style = strokeDashed
@@ -464,8 +500,8 @@ private fun TacticalRadarView(
             }
 
             // Crosshairs
-            drawLine(Color(0xFF1E282D), Offset(center.x, center.y - maxRadius), Offset(center.x, center.y + maxRadius), strokeWidth = 1.dp.toPx())
-            drawLine(Color(0xFF1E282D), Offset(center.x - maxRadius, center.y), Offset(center.x + maxRadius, center.y), strokeWidth = 1.dp.toPx())
+            drawLine(PrimaryPink.copy(alpha = 0.15f), Offset(center.x, center.y - maxRadius), Offset(center.x, center.y + maxRadius), strokeWidth = 1.dp.toPx())
+            drawLine(PrimaryPink.copy(alpha = 0.15f), Offset(center.x - maxRadius, center.y), Offset(center.x + maxRadius, center.y), strokeWidth = 1.dp.toPx())
 
             // Plot Safe Zones (max distance cap 5.0 km)
             safeZones.forEach { zone ->
@@ -474,7 +510,6 @@ private fun TacticalRadarView(
                 val clampedDist = distKm.coerceAtMost(5.0)
                 val radiusPx = (clampedDist / 5.0) * maxRadius
 
-                // Bearing: 0 deg = North (up: -y), 90 deg = East (+x)
                 val angleRad = Math.toRadians(bearing.toDouble() - 90.0)
                 val targetX = center.x + (radiusPx * cos(angleRad)).toFloat()
                 val targetY = center.y + (radiusPx * sin(angleRad)).toFloat()
@@ -482,22 +517,21 @@ private fun TacticalRadarView(
                 val pinColor = when (zone.category) {
                     SafeZoneCategory.POLICE -> GuardianBlue
                     SafeZoneCategory.HOSPITAL -> SafeGreen
-                    SafeZoneCategory.WOMEN_HELP_DESK -> EmergencyRed
+                    SafeZoneCategory.WOMEN_HELP_DESK -> PrimaryPink
                     SafeZoneCategory.METRO_SECURITY -> VigilanceAmber
                 }
 
                 val isSelected = selectedZone?.id == zone.id
 
-                // Draw beacon pin
                 drawCircle(
                     color = pinColor,
-                    radius = if (isSelected) 8.dp.toPx() else 5.dp.toPx(),
+                    radius = if (isSelected) 9.dp.toPx() else 6.dp.toPx(),
                     center = Offset(targetX, targetY)
                 )
                 if (isSelected) {
                     drawCircle(
                         color = Color.White,
-                        radius = 11.dp.toPx(),
+                        radius = 12.dp.toPx(),
                         center = Offset(targetX, targetY),
                         style = Stroke(width = 2.dp.toPx())
                     )
@@ -514,21 +548,21 @@ private fun TacticalRadarView(
                     val targetX = center.x + (radiusPx * cos(angleRad)).toFloat()
                     val targetY = center.y + (radiusPx * sin(angleRad)).toFloat()
 
-                    drawCircle(color = Color.Red, radius = 9.dp.toPx(), center = Offset(targetX, targetY))
-                    drawCircle(color = Color.White, radius = 13.dp.toPx(), center = Offset(targetX, targetY), style = Stroke(width = 2.dp.toPx()))
+                    drawCircle(color = EmergencyRed, radius = 10.dp.toPx(), center = Offset(targetX, targetY))
+                    drawCircle(color = Color.White, radius = 14.dp.toPx(), center = Offset(targetX, targetY), style = Stroke(width = 2.dp.toPx()))
                 }
             }
 
             // Center User Dot
-            drawCircle(color = GuardianBlue, radius = 7.dp.toPx(), center = center)
-            drawCircle(color = Color.White, radius = 10.dp.toPx(), center = center, style = Stroke(width = 2.dp.toPx()))
+            drawCircle(color = PrimaryPink, radius = 8.dp.toPx(), center = center)
+            drawCircle(color = Color.White, radius = 11.dp.toPx(), center = center, style = Stroke(width = 2.5.dp.toPx()))
         }
 
         // Cardinal directions labels
-        Text("N", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = GuardianBlue), modifier = Modifier.align(Alignment.TopCenter).padding(top = 4.dp))
-        Text("S", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = TextMuted), modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 4.dp))
-        Text("E", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = TextMuted), modifier = Modifier.align(Alignment.CenterEnd).padding(end = 6.dp))
-        Text("W", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = TextMuted), modifier = Modifier.align(Alignment.CenterStart).padding(start = 6.dp))
+        Text("N", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = PrimaryPink), modifier = Modifier.align(Alignment.TopCenter).padding(top = 6.dp))
+        Text("S", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = TextSecondary), modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp))
+        Text("E", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = TextSecondary), modifier = Modifier.align(Alignment.CenterEnd).padding(end = 8.dp))
+        Text("W", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, color = TextSecondary), modifier = Modifier.align(Alignment.CenterStart).padding(start = 8.dp))
     }
 }
 
@@ -541,30 +575,26 @@ private fun SafeZoneCard(
     onCall: () -> Unit,
     onDirections: () -> Unit
 ) {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) Color(0xFF221E28) else Color(0xFF191919)
-        ),
-        shape = RoundedCornerShape(12.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onSelect() }
+    AppCard(
+        backgroundColor = if (isSelected) SoftPinkSurface else MaterialTheme.colorScheme.surface,
+        borderColor = if (isSelected) PrimaryPink else BorderDivider,
+        onClick = onSelect
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(44.dp)
                         .clip(CircleShape)
                         .background(
                             when (zone.category) {
-                                SafeZoneCategory.POLICE -> GuardianBlue.copy(alpha = 0.2f)
-                                SafeZoneCategory.HOSPITAL -> SafeGreen.copy(alpha = 0.2f)
-                                SafeZoneCategory.WOMEN_HELP_DESK -> EmergencyRed.copy(alpha = 0.2f)
-                                SafeZoneCategory.METRO_SECURITY -> VigilanceAmber.copy(alpha = 0.2f)
+                                SafeZoneCategory.POLICE -> GuardianBlue.copy(alpha = 0.15f)
+                                SafeZoneCategory.HOSPITAL -> SafeGreen.copy(alpha = 0.15f)
+                                SafeZoneCategory.WOMEN_HELP_DESK -> PrimaryPink.copy(alpha = 0.15f)
+                                SafeZoneCategory.METRO_SECURITY -> VigilanceAmber.copy(alpha = 0.15f)
                             }
                         ),
                     contentAlignment = Alignment.Center
@@ -580,63 +610,67 @@ private fun SafeZoneCard(
                         tint = when (zone.category) {
                             SafeZoneCategory.POLICE -> GuardianBlue
                             SafeZoneCategory.HOSPITAL -> SafeGreen
-                            SafeZoneCategory.WOMEN_HELP_DESK -> EmergencyRed
+                            SafeZoneCategory.WOMEN_HELP_DESK -> PrimaryPink
                             SafeZoneCategory.METRO_SECURITY -> VigilanceAmber
                         },
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(14.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = zone.name,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp
+                        ),
+                        color = TextPrimary
+                    )
+                    Text(
+                        text = zone.address,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
                     )
                 }
 
                 Spacer(modifier = Modifier.width(10.dp))
 
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = zone.name,
-                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                        color = TextPrimary
-                    )
-                    Text(
-                        text = zone.address,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextMuted
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
                 Text(
                     text = distanceText,
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontWeight = FontWeight.Black,
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace
                     ),
                     color = SafeGreen
                 )
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(
                     onClick = onCall,
                     colors = ButtonDefaults.buttonColors(containerColor = SafeGreen),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.weight(1f).height(36.dp)
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(56.dp)
                 ) {
-                    Icon(Icons.Default.Call, contentDescription = null, modifier = Modifier.size(14.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("CALL ${zone.emergencyContact}", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.Call, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Call ${zone.emergencyContact}", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                 }
 
-                OutlinedButton(
+                SecondaryAppButton(
+                    text = "Map",
+                    icon = Icons.Default.Directions,
                     onClick = onDirections,
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.weight(1f).height(36.dp)
-                ) {
-                    Icon(Icons.Default.Directions, contentDescription = null, modifier = Modifier.size(14.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("MAP", fontSize = 11.sp)
-                }
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(56.dp)
+                )
             }
         }
     }
@@ -645,9 +679,9 @@ private fun SafeZoneCard(
 @Composable
 private fun LegendItem(color: Color, label: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(color))
-        Spacer(modifier = Modifier.width(4.dp))
-        Text(text = label, style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = TextMuted)
+        Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(color))
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(text = label, style = MaterialTheme.typography.labelSmall.copy(fontSize = 12.sp, fontWeight = FontWeight.Medium), color = TextSecondary)
     }
 }
 

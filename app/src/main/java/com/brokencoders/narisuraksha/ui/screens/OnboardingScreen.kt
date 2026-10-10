@@ -43,7 +43,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -65,9 +64,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.brokencoders.narisuraksha.core.PermissionHelper
+import com.brokencoders.narisuraksha.ui.components.AppCard
+import com.brokencoders.narisuraksha.ui.components.PrimaryAppButton
+import com.brokencoders.narisuraksha.ui.components.SecondaryAppButton
+import com.brokencoders.narisuraksha.ui.theme.BorderDivider
 import com.brokencoders.narisuraksha.ui.theme.EmergencyRed
 import com.brokencoders.narisuraksha.ui.theme.GuardianBlue
+import com.brokencoders.narisuraksha.ui.theme.PrimaryPink
 import com.brokencoders.narisuraksha.ui.theme.SafeGreen
+import com.brokencoders.narisuraksha.ui.theme.SoftPinkSurface
 import com.brokencoders.narisuraksha.ui.theme.TextMuted
 import com.brokencoders.narisuraksha.ui.theme.TextPrimary
 import com.brokencoders.narisuraksha.ui.theme.TextSecondary
@@ -99,96 +104,96 @@ fun OnboardingScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(24.dp),
+                .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             // App Shield Icon
             Box(
                 modifier = Modifier
-                    .size(76.dp)
+                    .size(80.dp)
                     .clip(CircleShape)
-                    .background(EmergencyRed.copy(alpha = 0.15f)),
+                    .background(SoftPinkSurface),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.Shield,
                     contentDescription = "Shield",
-                    tint = EmergencyRed,
-                    modifier = Modifier.size(40.dp)
+                    tint = PrimaryPink,
+                    modifier = Modifier.size(44.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             Text(
                 text = "Nari-Suraksha",
-                style = MaterialTheme.typography.headlineLarge.copy(
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 26.sp
+                style = MaterialTheme.typography.displayLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 32.sp
                 ),
-                color = TextPrimary
+                color = MaterialTheme.colorScheme.onBackground
             )
+
+            Spacer(modifier = Modifier.height(4.dp))
 
             Text(
                 text = "Autonomous Offline Safety & Decoy Guardian",
-                style = MaterialTheme.typography.titleMedium,
-                color = VigilanceAmber
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    color = PrimaryPink
+                )
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             Text(
-                text = "Works without cellular or internet connectivity by broadcasting compact emergency signals peer-to-peer over Bluetooth Low Energy.",
-                style = MaterialTheme.typography.bodyMedium,
+                text = "Protects you even without cellular or internet connectivity by broadcasting emergency distress signals peer-to-peer over Bluetooth Low Energy.",
+                style = MaterialTheme.typography.bodyLarge,
                 color = TextSecondary,
                 textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             // Mandatory Custom PIN Setup Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+            AppCard {
+                Column {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .size(32.dp)
+                                .size(40.dp)
                                 .clip(CircleShape)
-                                .background(VigilanceAmber.copy(alpha = 0.2f)),
+                                .background(SoftPinkSurface),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Calculate,
                                 contentDescription = null,
-                                tint = VigilanceAmber,
-                                modifier = Modifier.size(18.dp)
+                                tint = PrimaryPink,
+                                modifier = Modifier.size(22.dp)
                             )
                         }
-                        Spacer(modifier = Modifier.width(10.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(
-                                text = "Set Your Secret Decoy PIN (Required)",
+                                text = "Set Secret Decoy PIN (Required)",
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp
+                                    fontSize = 18.sp
                                 ),
                                 color = TextPrimary
                             )
                             Text(
-                                text = "Choose a custom 4-digit code to trigger SOS inside the calculator",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = TextMuted
+                                text = "4-digit code to trigger SOS inside the disguised calculator",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = TextSecondary
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
                     OutlinedTextField(
                         value = userCustomPin,
@@ -205,17 +210,17 @@ fun OnboardingScreen(
                             if (pinError != null) {
                                 Text(text = pinError!!, color = EmergencyRed)
                             } else {
-                                Text(text = "Do not use default 1234 for your safety", color = TextMuted)
+                                Text(text = "Do not use default 1234 for your safety", color = TextSecondary)
                             }
                         },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedBorderColor = VigilanceAmber,
-                            unfocusedBorderColor = Color(0xFF444444),
-                            focusedLabelColor = VigilanceAmber,
-                            unfocusedLabelColor = TextMuted
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            focusedBorderColor = PrimaryPink,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                            focusedLabelColor = PrimaryPink,
+                            unfocusedLabelColor = TextSecondary
                         ),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
@@ -223,18 +228,18 @@ fun OnboardingScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-            // Permissions Checklist Cards
+            // Permissions Checklist
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 PermissionItem(
                     title = "Bluetooth Low Energy (Nearby)",
-                    subtitle = "Required to broadcast & receive offline beacons from nearby phones.",
+                    subtitle = "Broadcast & receive offline beacons from nearby phones.",
                     icon = Icons.Default.Bluetooth,
-                    iconTint = GuardianBlue,
+                    iconTint = PrimaryPink,
                     isGranted = PermissionHelper.hasBluetoothPermissions(context)
                 )
 
@@ -242,13 +247,13 @@ fun OnboardingScreen(
                     title = "GPS / Device Location",
                     subtitle = "Provides exact GPS coordinates in SOS packet without internet.",
                     icon = Icons.Default.MyLocation,
-                    iconTint = EmergencyRed,
+                    iconTint = PrimaryPink,
                     isGranted = PermissionHelper.hasLocationPermission(context)
                 )
 
                 PermissionItem(
                     title = "Audio Recording",
-                    subtitle = "Records local audio evidence securely on device during confirmed SOS.",
+                    subtitle = "Records local audio evidence securely during confirmed SOS.",
                     icon = Icons.Default.Mic,
                     iconTint = SafeGreen,
                     isGranted = PermissionHelper.hasAudioPermission(context)
@@ -256,7 +261,7 @@ fun OnboardingScreen(
 
                 PermissionItem(
                     title = "High Priority Notifications",
-                    subtitle = "Alerts you with sound and vibration if a person triggers SOS nearby.",
+                    subtitle = "Alerts with sound and vibration if someone triggers SOS nearby.",
                     icon = Icons.Default.NotificationsActive,
                     iconTint = VigilanceAmber,
                     isGranted = hasAllPermissions
@@ -264,34 +269,25 @@ fun OnboardingScreen(
 
                 PermissionItem(
                     title = "Battery Optimization Exemption",
-                    subtitle = "Allows background scanner to listen for emergency alerts when screen is off.",
+                    subtitle = "Allows background scanner to listen when screen is off.",
                     icon = Icons.Default.BatteryAlert,
-                    iconTint = Color(0xFFAB47BC),
+                    iconTint = PrimaryPink,
                     isGranted = isBatteryOptIgnored
                 )
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(28.dp))
 
             // Action Buttons
             if (!hasAllPermissions) {
-                Button(
+                PrimaryAppButton(
+                    text = "Grant Permissions",
                     onClick = {
                         val permissions = PermissionHelper.getRequiredPermissions().toTypedArray()
                         permissionLauncher.launch(permissions)
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = EmergencyRed),
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp)
-                ) {
-                    Text(
-                        text = "GRANT PERMISSIONS",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
-                    )
-                }
+                    modifier = Modifier.fillMaxWidth()
+                )
             } else if (!isBatteryOptIgnored) {
                 Button(
                     onClick = {
@@ -309,49 +305,37 @@ fun OnboardingScreen(
                             }
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = VigilanceAmber),
-                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryPink),
+                    shape = RoundedCornerShape(20.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(52.dp)
+                        .height(64.dp)
                 ) {
                     Text(
-                        text = "DISABLE BATTERY OPTIMIZATION",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp,
-                        color = Color.Black
+                        text = "Disable Battery Optimization",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = Color.White
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-            Button(
+            PrimaryAppButton(
+                text = "Initialize Guardian",
+                enabled = hasAllPermissions && userCustomPin.length == 4,
                 onClick = {
                     if (userCustomPin.length != 4) {
                         pinError = "Please enter a 4-digit PIN for Decoy Mode"
                         Toast.makeText(context, "Please set a 4-digit Decoy PIN", Toast.LENGTH_SHORT).show()
-                        return@Button
+                        return@PrimaryAppButton
                     }
                     onComplete(userCustomPin)
                 },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (hasAllPermissions && userCustomPin.length == 4) SafeGreen else Color(0xFF333333),
-                    contentColor = Color.White
-                ),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp)
-            ) {
-                Text(
-                    text = "INITIALIZE GUARDIAN",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
-            }
+                modifier = Modifier.fillMaxWidth()
+            )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(28.dp))
         }
     }
 }
@@ -364,58 +348,52 @@ private fun PermissionItem(
     iconTint: Color,
     isGranted: Boolean
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
-        shape = RoundedCornerShape(14.dp)
-    ) {
+    AppCard {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(40.dp)
                     .clip(CircleShape)
-                    .background(iconTint.copy(alpha = 0.15f)),
+                    .background(SoftPinkSurface),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
                     tint = iconTint,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(22.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.width(10.dp))
+            Spacer(modifier = Modifier.width(14.dp))
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 13.sp
+                        fontSize = 16.sp
                     ),
                     color = TextPrimary
                 )
                 Text(
                     text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextMuted
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextSecondary
                 )
             }
 
-            Spacer(modifier = Modifier.width(6.dp))
+            Spacer(modifier = Modifier.width(8.dp))
 
             if (isGranted) {
                 Icon(
                     imageVector = Icons.Default.CheckCircle,
                     contentDescription = "Granted",
                     tint = SafeGreen,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(24.dp)
                 )
             }
         }

@@ -50,12 +50,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.brokencoders.narisuraksha.ui.theme.EmergencyRed
-import com.brokencoders.narisuraksha.ui.theme.GuardianBlue
-import com.brokencoders.narisuraksha.ui.theme.SafeGreen
+import com.brokencoders.narisuraksha.ui.theme.PrimaryPink
+import com.brokencoders.narisuraksha.ui.theme.SoftPinkSurface
 import com.brokencoders.narisuraksha.ui.theme.TextMuted
 import com.brokencoders.narisuraksha.ui.theme.TextPrimary
 import com.brokencoders.narisuraksha.ui.theme.TextSecondary
-import com.brokencoders.narisuraksha.ui.theme.VigilanceAmber
 
 @Composable
 fun SettingsDialog(
@@ -72,7 +71,8 @@ fun SettingsDialog(
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(24.dp),
-            color = Color(0xFF1E1E1E),
+            color = MaterialTheme.colorScheme.surface,
+            border = androidx.compose.foundation.BorderStroke(1.5.dp, MaterialTheme.colorScheme.outline),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(
@@ -88,31 +88,34 @@ fun SettingsDialog(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(40.dp)
                                 .clip(CircleShape)
-                                .background(GuardianBlue.copy(alpha = 0.2f)),
+                                .background(SoftPinkSurface),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Lock,
                                 contentDescription = null,
-                                tint = GuardianBlue,
-                                modifier = Modifier.size(20.dp)
+                                tint = PrimaryPink,
+                                modifier = Modifier.size(22.dp)
                             )
                         }
-                        Spacer(modifier = Modifier.width(10.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
                         Text(
                             text = "Safety Settings",
                             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                            color = TextPrimary
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
 
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.size(36.dp)
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Close",
-                            tint = TextMuted
+                            tint = TextSecondary
                         )
                     }
                 }
@@ -122,30 +125,30 @@ fun SettingsDialog(
                 // Anonymous ID badge
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF282828)),
-                    shape = RoundedCornerShape(12.dp)
+                    colors = CardDefaults.cardColors(containerColor = SoftPinkSurface),
+                    shape = RoundedCornerShape(16.dp)
                 ) {
                     Row(
-                        modifier = Modifier.padding(12.dp),
+                        modifier = Modifier.padding(14.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
                             imageVector = Icons.Default.PermIdentity,
                             contentDescription = null,
-                            tint = VigilanceAmber,
-                            modifier = Modifier.size(20.dp)
+                            tint = PrimaryPink,
+                            modifier = Modifier.size(24.dp)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Text(
                                 text = "Anonymous BLE ID: #$anonymousDeviceId",
-                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                                 color = TextPrimary
                             )
                             Text(
                                 text = "Random non-identifiable 16-bit beacon ID",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = TextMuted
+                                color = TextSecondary
                             )
                         }
                     }
@@ -159,25 +162,25 @@ fun SettingsDialog(
                         Icon(
                             imageVector = Icons.Default.Calculate,
                             contentDescription = null,
-                            tint = VigilanceAmber,
-                            modifier = Modifier.size(18.dp)
+                            tint = PrimaryPink,
+                            modifier = Modifier.size(20.dp)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "Secret Decoy PIN",
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                            color = TextPrimary
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = "Entering this PIN followed by '=' in Decoy Mode fires the SOS beacon silently.",
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = TextSecondary
                     )
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
                     OutlinedTextField(
                         value = newPinText,
@@ -193,62 +196,53 @@ fun SettingsDialog(
                             if (pinError != null) {
                                 Text(text = pinError!!, color = EmergencyRed)
                             } else {
-                                Text(text = "Default is 1234", color = TextMuted)
+                                Text(text = "Default is 1234", color = TextSecondary)
                             }
                         },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
-                            focusedBorderColor = VigilanceAmber,
-                            unfocusedBorderColor = Color(0xFF444444),
-                            focusedLabelColor = VigilanceAmber,
-                            unfocusedLabelColor = TextMuted
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            focusedBorderColor = PrimaryPink,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                            focusedLabelColor = PrimaryPink,
+                            unfocusedLabelColor = TextSecondary
                         ),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
 
+                Spacer(modifier = Modifier.height(14.dp))
+
                 // BLE Diagnostics Button
-                OutlinedButton(
+                SecondaryAppButton(
+                    text = "BLE Diagnostics & Test Mode",
+                    icon = Icons.Default.Vibration,
                     onClick = {
                         onDismiss()
                         onOpenBleDebug()
                     },
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(44.dp)
-                ) {
-                    Icon(imageVector = Icons.Default.Vibration, contentDescription = null, tint = VigilanceAmber, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = "BLE DIAGNOSTICS & TEST MODE", color = VigilanceAmber, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                }
+                    modifier = Modifier.fillMaxWidth()
+                )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 // Save button
-                Button(
+                PrimaryAppButton(
+                    text = "Save Settings",
+                    icon = Icons.Default.Save,
                     onClick = {
                         if (newPinText.length != 4) {
                             pinError = "PIN must be exactly 4 digits"
-                            return@Button
+                            return@PrimaryAppButton
                         }
                         onSavePin(newPinText)
                         Toast.makeText(context, "Secret Decoy PIN updated to $newPinText", Toast.LENGTH_SHORT).show()
                         onDismiss()
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = SafeGreen),
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                ) {
-                    Icon(imageVector = Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = "SAVE SETTINGS", fontWeight = FontWeight.Bold)
-                }
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
     }
