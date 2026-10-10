@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">Calculator</string>
+    <string name="real_app_name">Nari Suraksha</string>
+    <string name="app_tagline">Works without cellular or internet connectivity.</string>
+    <string name="sos_broadcast_title">SOS Beacon Active</string>
+    <string name="sos_broadcast_desc">Broadcasting distress signal peer-to-peer over BLE</string>
+    <string name="scan_service_title">Calculator Service</string>
+    <string name="scan_service_desc">Background process active</string>
+    <string name="alert_notification_title">🚨 Emergency Alert Nearby</string>
+    <string name="alert_notification_desc">A distress beacon was detected nearby.</string>
+</resources>
