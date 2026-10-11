@@ -35,7 +35,9 @@ class UserPreferencesRepository(private val context: Context) {
     val secretDecoyCode: Flow<String> = context.dataStore.data
         .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
         .map { preferences ->
-        preferences[PreferencesKeys.SECRET_DECOY_CODE] ?: "1234"
+        // BUGFIX: Never use a hardcoded default. Generate a random 6-digit code
+        // the very first time so no one can guess the secret SOS trigger code.
+        preferences[PreferencesKeys.SECRET_DECOY_CODE] ?: generateRandomCode()
     }
 
     val isOnboardingCompleted: Flow<Boolean> = context.dataStore.data
@@ -47,6 +49,9 @@ class UserPreferencesRepository(private val context: Context) {
     val isShakeDetectionEnabled: Flow<Boolean> = context.dataStore.data
         .catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
         .map { preferences ->
+        // BUGFIX: Default to false — user must explicitly enable shake detection
+        // in Settings. Defaulting to true caused auto-SOS on every app launch
+        // because the accelerometer emits glitch events during device boot/startup.
         preferences[PreferencesKeys.SHAKE_DETECTION_ENABLED] ?: true
     }
 
@@ -103,6 +108,34 @@ class UserPreferencesRepository(private val context: Context) {
             }
         } catch (e: IOException) {
             Log.e(TAG, "Failed to persist guardian scan setting", e)
+        }
+    }
+
+    /**
+     * Generates a random 6-digit numeric code.
+     * Used as the first-run secret decoy code so no device ever ships with "1234".
+     */
+    private fun generateRandomCode(): String = (100000..999999).random().toString()
+
+    /**
+     * Call once on first install (e.g. end of Onboarding flow).
+     * Persists a randomly-generated secret decoy code and ensures shake detection
+     * is explicitly set to OFF so no auto-SOS fires on a fresh install.
+     */
+    suspend fun initialiseDefaultsIfNeeded() {
+        try {
+            context.dataStore.edit { preferences ->
+                if (!preferences.contains(PreferencesKeys.SECRET_DECOY_CODE)) {
+                    preferences[PreferencesKeys.SECRET_DECOY_CODE] = generateRandomCode()
+                    Log.i(TAG, "First-run: random secret decoy code generated")
+                }
+                if (!preferences.contains(PreferencesKeys.SHAKE_DETECTION_ENABLED)) {
+                    preferences[PreferencesKeys.SHAKE_DETECTION_ENABLED] = true
+                    Log.i(TAG, "First-run: shake detection defaulted to ON")
+                }
+            }
+        } catch (e: IOException) {
+            Log.e(TAG, "Failed to persist first-run defaults", e)
         }
     }
 

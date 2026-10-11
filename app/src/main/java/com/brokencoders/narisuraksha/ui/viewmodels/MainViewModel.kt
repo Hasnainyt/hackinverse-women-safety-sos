@@ -61,8 +61,10 @@ class MainViewModel(
     val countdownSeconds: StateFlow<Int> = sosManager.countdownSeconds
     val isSosActive: StateFlow<Boolean> = sosManager.isSosActive
 
+    // BUGFIX: initial value changed from 'true' to 'false' — prevents the shake
+    // detector from arming before DataStore has emitted the persisted preference.
     val isShakeEnabled: StateFlow<Boolean> = preferencesRepository.isShakeDetectionEnabled
-        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     val isScanEnabled: StateFlow<Boolean> = preferencesRepository.isGuardianScanEnabled
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
@@ -70,8 +72,10 @@ class MainViewModel(
     val isDecoyEnabled: StateFlow<Boolean> = preferencesRepository.isDecoyModeEnabled
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    // BUGFIX: initial value changed from hardcoded "1234" to "" so the decoy
+    // calculator never accidentally matches a user input before DataStore emits.
     val secretDecoyCode: StateFlow<String> = preferencesRepository.secretDecoyCode
-        .stateIn(viewModelScope, SharingStarted.Eagerly, "1234")
+        .stateIn(viewModelScope, SharingStarted.Eagerly, "")
 
     val isOnboardingCompleted: StateFlow<Boolean> = preferencesRepository.isOnboardingCompleted
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
@@ -191,10 +195,24 @@ class MainViewModel(
             }
         }
 
-        // Sync shake detector state
+        // Sync shake detector state — only start AFTER onboarding AND after a
+        // startup warmup to ignore accelerometer glitches emitted at device boot.
         viewModelScope.launch {
             preferencesRepository.isShakeDetectionEnabled.collectLatest { enabled ->
+                // BUGFIX: Never start shake detection before onboarding is complete.
+                // isOnboardingCompleted is a StateFlow already eagerly collected above,
+                // so we read its cached value without an extra suspend call.
+                val onboardingDone = isOnboardingCompleted.value
+                if (!onboardingDone) {
+                    shakeDetector.stop()
+                    return@collectLatest
+                }
                 if (enabled) {
+                    // BUGFIX: Wait 3 seconds before arming the shake detector.
+                    // Android's accelerometer emits high-G transient spikes immediately
+                    // after the sensor is first registered (power-on noise). Without this
+                    // delay those glitches silently fire the SOS countdown on every launch.
+                    kotlinx.coroutines.delay(SHAKE_DETECTOR_WARMUP_MS)
                     shakeDetector.start()
                 } else {
                     shakeDetector.stop()
@@ -588,6 +606,9 @@ class MainViewModel(
 
     fun setOnboardingCompleted(completed: Boolean) {
         viewModelScope.launch {
+            // BUGFIX: Persist safe defaults (random secret code + shake=false) before
+            // any SOS-related services are allowed to start for the first time.
+            preferencesRepository.initialiseDefaultsIfNeeded()
             preferencesRepository.setOnboardingCompleted(completed)
             if (completed) {
                 ensureGuardianScanActive()
@@ -780,6 +801,14 @@ class MainViewModel(
 
         /** Gap between ACK bursts; exceeds ACK_COOLDOWN so bursts never self-skip. */
         private const val ACK_BURST_GAP_MS = 3_500L
+
+        /**
+         * BUGFIX: Warmup delay before the shake detector is armed after start.
+         * Accelerometers emit high-G transient spikes immediately after the sensor is
+         * registered (power-on noise). This 3-second window discards those glitches so
+         * they never silently fire an SOS countdown on every app launch.
+         */
+        private const val SHAKE_DETECTOR_WARMUP_MS = 3_000L
 
         fun provideFactory(
             context: Context,
