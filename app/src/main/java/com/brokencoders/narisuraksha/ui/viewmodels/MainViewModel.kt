@@ -253,6 +253,15 @@ class MainViewModel(
         sosManager.stopSos()
         SosForegroundService.stop(context)
 
+        // Standing down silences the deterrents too: a victim tapping
+        // "I'm Safe" must never leave a blaring siren or torch behind.
+        if (_isSirenOn.value) {
+            toggleSiren()
+        }
+        if (_isFlashlightOn.value) {
+            toggleFlashlight()
+        }
+
         // BleAdvertiser internally flushes any deferred ACKs when the SOS slot frees up.
         BleDiagnosticsTracker.recordEvent(
             "NARI_BLE_ACK_DRAINED",

@@ -24,6 +24,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.automirrored.outlined.VolumeOff
+import androidx.compose.material.icons.outlined.FlashlightOff
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.FlashlightOn
@@ -127,6 +129,8 @@ fun HomeScreen(
     val responderAckCount by viewModel.responderAckCount.collectAsState()
     val latestAlert by viewModel.latestReceivedAlert.collectAsState()
     val isScanEnabled by viewModel.isScanEnabled.collectAsState()
+    val isSirenOn by viewModel.isSirenOn.collectAsState()
+    val isFlashlightOn by viewModel.isFlashlightOn.collectAsState()
 
     // Strict system readiness: Bluetooth + Location + runtime permissions are
     // mandatory for mesh SOS. The gate below blocks the home content until all
@@ -352,6 +356,10 @@ fun HomeScreen(
                 if (isSosActive) {
                     ActiveSosCard(
                         responderCount = responderAckCount,
+                        isSirenOn = isSirenOn,
+                        isFlashlightOn = isFlashlightOn,
+                        onToggleSiren = { viewModel.toggleSiren() },
+                        onToggleFlashlight = { viewModel.toggleFlashlight() },
                         onStopBroadcast = { viewModel.stopSos() },
                         modifier = Modifier.padding(bottom = 16.dp)
                     )
@@ -716,6 +724,10 @@ private fun ReadinessRow(
 @Composable
 private fun ActiveSosCard(
     responderCount: Int,
+    isSirenOn: Boolean,
+    isFlashlightOn: Boolean,
+    onToggleSiren: () -> Unit,
+    onToggleFlashlight: () -> Unit,
     onStopBroadcast: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -815,6 +827,61 @@ private fun ActiveSosCard(
             }
 
             Spacer(modifier = Modifier.height(14.dp))
+
+            // Deterrent tools: loud siren + strobe torch while broadcasting
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Button(
+                    onClick = onToggleSiren,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isSirenOn) EmergencyRed else SoftPinkSurface,
+                        contentColor = if (isSirenOn) Color.White else PrimaryPink
+                    ),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isSirenOn) Icons.AutoMirrored.Outlined.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (isSirenOn) stringResource(R.string.stop_siren) else stringResource(R.string.loud_siren),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Button(
+                    onClick = onToggleFlashlight,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isFlashlightOn) WarningAmber else SoftPinkSurface,
+                        contentColor = if (isFlashlightOn) Color.White else PrimaryPink
+                    ),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isFlashlightOn) Icons.Outlined.FlashlightOff else Icons.Default.FlashlightOn,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (isFlashlightOn) stringResource(R.string.torch_off) else stringResource(R.string.strobe_torch),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
 
             Button(
                 onClick = onStopBroadcast,
