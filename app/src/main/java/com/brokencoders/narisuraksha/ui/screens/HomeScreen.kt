@@ -24,6 +24,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.automirrored.outlined.VolumeOff
+import androidx.compose.material.icons.outlined.FlashlightOff
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.FlashlightOn
@@ -34,6 +36,7 @@ import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.Warning
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -54,6 +57,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -93,6 +97,9 @@ import com.brokencoders.narisuraksha.ui.theme.TextPrimary
 import com.brokencoders.narisuraksha.ui.theme.TextSecondary
 import com.brokencoders.narisuraksha.ui.theme.WarningAmber
 import com.brokencoders.narisuraksha.ui.viewmodels.MainViewModel
+import android.bluetooth.BluetoothAdapter
+import android.content.Intent
+import android.provider.Settings
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -122,10 +129,12 @@ fun HomeScreen(
     val responderAckCount by viewModel.responderAckCount.collectAsState()
     val latestAlert by viewModel.latestReceivedAlert.collectAsState()
     val isScanEnabled by viewModel.isScanEnabled.collectAsState()
+    val isSirenOn by viewModel.isSirenOn.collectAsState()
+    val isFlashlightOn by viewModel.isFlashlightOn.collectAsState()
 
-    // Runtime permission state for offline BLE mesh + SOS. The redesign has no
-    // in-home permission recovery, so without this a fresh install that denies
-    // once can never start the guardian scan from Home.
+    // Strict system readiness: Bluetooth + Location + runtime permissions are
+    // mandatory for mesh SOS. The gate below blocks the home content until all
+    // three are satisfied, with one-tap fixes for each.
     val context = LocalContext.current
     var hasPermissions by remember {
         mutableStateOf(PermissionHelper.hasAllPermissions(context))
@@ -133,26 +142,40 @@ fun HomeScreen(
     var hasBluetoothPerm by remember {
         mutableStateOf(PermissionHelper.hasBluetoothPermissions(context))
     }
+    var isBtEnabled by remember {
+        mutableStateOf(PermissionHelper.isBluetoothEnabled(context))
+    }
+    var isLocEnabled by remember {
+        mutableStateOf(PermissionHelper.isLocationServiceEnabled(context))
+    }
+
+    fun refreshReadiness() {
+        hasPermissions = PermissionHelper.hasAllPermissions(context)
+        hasBluetoothPerm = PermissionHelper.hasBluetoothPermissions(context)
+        isBtEnabled = PermissionHelper.isBluetoothEnabled(context)
+        isLocEnabled = PermissionHelper.isLocationServiceEnabled(context)
+        if (hasBluetoothPerm && isBtEnabled) {
+            viewModel.ensureGuardianScanActive()
+        }
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) {
-        hasPermissions = PermissionHelper.hasAllPermissions(context)
-        hasBluetoothPerm = PermissionHelper.hasBluetoothPermissions(context)
-        if (hasBluetoothPerm) {
-            viewModel.ensureGuardianScanActive()
-        }
+        refreshReadiness()
+    }
+
+    val bluetoothEnableLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) {
+        refreshReadiness()
     }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                hasPermissions = PermissionHelper.hasAllPermissions(context)
-                hasBluetoothPerm = PermissionHelper.hasBluetoothPermissions(context)
-                if (hasBluetoothPerm) {
-                    viewModel.ensureGuardianScanActive()
-                }
+                refreshReadiness()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -162,10 +185,10 @@ fun HomeScreen(
     }
 
     LaunchedEffect(Unit) {
-        if (hasBluetoothPerm) {
-            viewModel.ensureGuardianScanActive()
-        }
+        refreshReadiness()
     }
+
+    val isSystemReady = hasPermissions && hasBluetoothPerm && isBtEnabled && isLocEnabled
 
     val lastUpdatedText = remember(currentCoords) {
         currentCoords?.timestamp?.let {
@@ -173,10 +196,12 @@ fun HomeScreen(
         } ?: "Today, 10:24 AM"
     }
 
-    // Launch SOS Countdown
-    val triggerSos = {
-        if (!isSosActive && !isCountingDown) {
+    // Launch SOS Countdown (blocked until Bluetooth + Location are strictly on)
+    val triggerSos: () -> Unit = {
+        if (isSystemReady && !isSosActive && !isCountingDown) {
             viewModel.triggerSos()
+        } else if (!isSystemReady) {
+            refreshReadiness()
         }
     }
 
@@ -331,6 +356,10 @@ fun HomeScreen(
                 if (isSosActive) {
                     ActiveSosCard(
                         responderCount = responderAckCount,
+                        isSirenOn = isSirenOn,
+                        isFlashlightOn = isFlashlightOn,
+                        onToggleSiren = { viewModel.toggleSiren() },
+                        onToggleFlashlight = { viewModel.toggleFlashlight() },
                         onStopBroadcast = { viewModel.stopSos() },
                         modifier = Modifier.padding(bottom = 16.dp)
                     )
@@ -470,6 +499,63 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(16.dp))
             }
 
+            // Strict readiness gate: blocks home content until Bluetooth +
+            // Location + permissions are all on. Full-size overlay consumes
+            // touches so SOS/mesh actions cannot fire while not ready.
+            if (!isSystemReady) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = {}
+                        )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 20.dp, vertical = 12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        SystemReadinessGate(
+                            hasPermissions = hasPermissions,
+                            hasBluetoothPerm = hasBluetoothPerm,
+                            isBtEnabled = isBtEnabled,
+                            isLocEnabled = isLocEnabled,
+                            onGrantPermissions = {
+                                permissionLauncher.launch(
+                                    PermissionHelper.getRequiredPermissions().toTypedArray()
+                                )
+                            },
+                            onEnableBluetooth = {
+                                try {
+                                    bluetoothEnableLauncher.launch(
+                                        Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+                                    )
+                                } catch (_: Exception) {
+                                    refreshReadiness()
+                                }
+                            },
+                            onEnableLocation = {
+                                try {
+                                    context.startActivity(
+                                        Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+                                    )
+                                } catch (_: Exception) {
+                                    refreshReadiness()
+                                }
+                            },
+                            onOpenSettings = {
+                                PermissionHelper.openAppSettings(context)
+                            }
+                        )
+                    }
+                }
+            }
+
             // Fullscreen Countdown Overlay with Haptic Ticks
             CountdownOverlay(
                 isCountingDown = isCountingDown,
@@ -481,11 +567,167 @@ fun HomeScreen(
 }
 
 /**
+ * Strict startup gate: Bluetooth + Location + permissions must ALL be on
+ * before mesh SOS can run. Each row shows live status with a one-tap fix.
+ */
+@Composable
+private fun SystemReadinessGate(
+    hasPermissions: Boolean,
+    hasBluetoothPerm: Boolean,
+    isBtEnabled: Boolean,
+    isLocEnabled: Boolean,
+    onGrantPermissions: () -> Unit,
+    onEnableBluetooth: () -> Unit,
+    onEnableLocation: () -> Unit,
+    onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(modifier = Modifier.height(24.dp))
+        Box(
+            modifier = Modifier
+                .size(88.dp)
+                .clip(CircleShape)
+                .background(PrimaryPink.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Shield,
+                contentDescription = null,
+                tint = PrimaryPink,
+                modifier = Modifier.size(48.dp)
+            )
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "Safety System Setup",
+            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+            color = TextPrimary
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = "Bluetooth and Location must stay ON for offline SOS mesh broadcasting and rescue scanning.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = TextSecondary
+        )
+        Spacer(modifier = Modifier.height(20.dp))
+
+        ReadinessRow(
+            ready = hasPermissions,
+            icon = Icons.Default.CheckCircle,
+            title = "App Permissions",
+            subtitle = if (hasPermissions) "Granted" else "Bluetooth, location, audio, notifications",
+            actionText = "Grant",
+            onAction = onGrantPermissions
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        ReadinessRow(
+            ready = hasBluetoothPerm && isBtEnabled,
+            icon = Icons.Default.Bluetooth,
+            title = "Bluetooth",
+            subtitle = when {
+                !hasBluetoothPerm -> "Permission missing"
+                !isBtEnabled -> "Switched OFF — tap to turn on"
+                else -> "ON — mesh radio active"
+            },
+            actionText = "Turn On",
+            onAction = {
+                if (!hasBluetoothPerm) onGrantPermissions() else onEnableBluetooth()
+            }
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        ReadinessRow(
+            ready = isLocEnabled,
+            icon = Icons.Default.LocationOn,
+            title = "Location Services",
+            subtitle = if (isLocEnabled) "ON — GPS rescue coordinates active"
+            else "Switched OFF — tap to turn on",
+            actionText = "Turn On",
+            onAction = onEnableLocation
+        )
+        Spacer(modifier = Modifier.height(20.dp))
+        Button(
+            onClick = onOpenSettings,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = SoftPinkSurface,
+                contentColor = PrimaryPink
+            ),
+            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp)
+        ) {
+            Text("Open App Settings", fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+        }
+    }
+}
+
+@Composable
+private fun ReadinessRow(
+    ready: Boolean,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String,
+    actionText: String,
+    onAction: () -> Unit
+) {
+    InfoCard(
+        backgroundColor = if (ready) SafeGreen.copy(alpha = 0.08f) else WarningAmber.copy(alpha = 0.10f),
+        borderColor = if (ready) SafeGreen else WarningAmber
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (ready) Icons.Default.CheckCircle else icon,
+                contentDescription = null,
+                tint = if (ready) SafeGreen else WarningAmber,
+                modifier = Modifier.size(28.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = TextPrimary
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+            }
+            if (!ready) {
+                Button(
+                    onClick = onAction,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = PrimaryPink,
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.height(42.dp)
+                ) {
+                    Text(actionText, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                }
+            }
+        }
+    }
+}
+
+/**
  * Calm active broadcast indicator shown when SOS is live
  */
 @Composable
 private fun ActiveSosCard(
     responderCount: Int,
+    isSirenOn: Boolean,
+    isFlashlightOn: Boolean,
+    onToggleSiren: () -> Unit,
+    onToggleFlashlight: () -> Unit,
     onStopBroadcast: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -585,6 +827,61 @@ private fun ActiveSosCard(
             }
 
             Spacer(modifier = Modifier.height(14.dp))
+
+            // Deterrent tools: loud siren + strobe torch while broadcasting
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Button(
+                    onClick = onToggleSiren,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isSirenOn) EmergencyRed else SoftPinkSurface,
+                        contentColor = if (isSirenOn) Color.White else PrimaryPink
+                    ),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isSirenOn) Icons.AutoMirrored.Outlined.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (isSirenOn) stringResource(R.string.stop_siren) else stringResource(R.string.loud_siren),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Button(
+                    onClick = onToggleFlashlight,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isFlashlightOn) WarningAmber else SoftPinkSurface,
+                        contentColor = if (isFlashlightOn) Color.White else PrimaryPink
+                    ),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isFlashlightOn) Icons.Outlined.FlashlightOff else Icons.Default.FlashlightOn,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (isFlashlightOn) stringResource(R.string.torch_off) else stringResource(R.string.strobe_torch),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
 
             Button(
                 onClick = onStopBroadcast,

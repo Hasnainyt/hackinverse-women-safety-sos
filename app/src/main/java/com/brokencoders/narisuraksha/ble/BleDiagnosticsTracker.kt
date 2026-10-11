@@ -57,8 +57,9 @@ object BleDiagnosticsTracker {
 
     // Debug scan mode: When true, enables minimal/software filtering so hardware driver
     // limitations do not suppress incoming packets on heterogeneous OEM chipsets.
-    // Default to false (hardware filtering enabled) to prevent high-frequency packet flooding.
-    private val _debugScanModeEnabled = MutableStateFlow(false)
+    // Default to TRUE: universal discovery across chipsets beats battery savings,
+    // and the strict readiness gate + diagnostics screen let users toggle it.
+    private val _debugScanModeEnabled = MutableStateFlow(true)
     val debugScanModeEnabled: StateFlow<Boolean> = _debugScanModeEnabled.asStateFlow()
 
     private val _logs = MutableStateFlow<List<BleLogEntry>>(emptyList())

@@ -432,11 +432,7 @@ fun AlertScreen(
                                     try {
                                         val geoUri = Uri.parse("geo:$lat,$lon?q=$lat,$lon(Distress+SOS+Location)")
                                         val mapIntent = Intent(Intent.ACTION_VIEW, geoUri)
-                                        if (mapIntent.resolveActivity(context.packageManager) != null) {
-                                            context.startActivity(mapIntent)
-                                        } else {
-                                            Toast.makeText(context, "No offline map app installed", Toast.LENGTH_SHORT).show()
-                                        }
+                                        context.startActivity(mapIntent)
                                     } catch (e: android.content.ActivityNotFoundException) {
                                         Toast.makeText(context, "No offline map app installed", Toast.LENGTH_SHORT).show()
                                     } catch (e: Exception) {
