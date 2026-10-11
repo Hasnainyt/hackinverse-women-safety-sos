@@ -379,7 +379,11 @@ private fun SosHistoryCard(
                         color = TextSecondary
                     )
                     Text(
-                        text = "${bucket.approxDistanceText} (${event.rssi} dBm)",
+                        text = if (event.rssi == com.brokencoders.narisuraksha.ble.RSSI_WIFI_SENTINEL) {
+                            "via WiFi mesh (extended range)"
+                        } else {
+                            "${bucket.approxDistanceText} (${event.rssi} dBm)"
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         color = SafeGreen
                     )
