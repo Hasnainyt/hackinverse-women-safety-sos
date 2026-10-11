@@ -29,9 +29,14 @@ class SosForegroundService : Service() {
         val notification = notificationHelper.buildSosBroadcastingNotification()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            var fgsType = ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+            var fgsType = ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+            if (com.brokencoders.narisuraksha.core.PermissionHelper.hasLocationPermission(this)) {
+                fgsType = fgsType or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                fgsType = fgsType or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                if (com.brokencoders.narisuraksha.core.PermissionHelper.hasAudioPermission(this)) {
+                    fgsType = fgsType or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                }
             }
             startForeground(Constants.NOTIFICATION_ID_SOS_ACTIVE, notification, fgsType)
         } else {
@@ -116,16 +121,20 @@ class SosForegroundService : Service() {
         const val EXTRA_AUDIO_PATH = "extra_audio_path"
 
         fun start(context: Context, lat: Double?, lon: Double?, audioPath: String?) {
-            val intent = Intent(context, SosForegroundService::class.java).apply {
-                action = ACTION_START_SOS
-                lat?.let { putExtra(EXTRA_LAT, it) }
-                lon?.let { putExtra(EXTRA_LON, it) }
-                audioPath?.let { putExtra(EXTRA_AUDIO_PATH, it) }
-            }
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            try {
+                val intent = Intent(context, SosForegroundService::class.java).apply {
+                    action = ACTION_START_SOS
+                    lat?.let { putExtra(EXTRA_LAT, it) }
+                    lon?.let { putExtra(EXTRA_LON, it) }
+                    audioPath?.let { putExtra(EXTRA_AUDIO_PATH, it) }
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to start SosForegroundService: ${e.message}", e)
             }
         }
 

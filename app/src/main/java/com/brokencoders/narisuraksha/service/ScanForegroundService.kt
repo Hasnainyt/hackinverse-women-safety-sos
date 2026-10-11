@@ -3,6 +3,8 @@ package com.brokencoders.narisuraksha.service
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
+import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
@@ -26,7 +28,15 @@ class ScanForegroundService : Service() {
         Log.d(TAG, "ScanForegroundService onCreate")
 
         val notificationHelper = (application as NariSurakshaApp).notificationHelper
-        startForeground(Constants.NOTIFICATION_ID_SERVICE, notificationHelper.buildScanServiceNotification())
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                Constants.NOTIFICATION_ID_SERVICE,
+                notificationHelper.buildScanServiceNotification(),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+            )
+        } else {
+            startForeground(Constants.NOTIFICATION_ID_SERVICE, notificationHelper.buildScanServiceNotification())
+        }
 
         acquireWakeLock()
         startScanning()
@@ -106,13 +116,17 @@ class ScanForegroundService : Service() {
         const val ACTION_STOP_SCAN = "com.brokencoders.narisuraksha.STOP_SCAN"
 
         fun start(context: Context) {
-            val intent = Intent(context, ScanForegroundService::class.java).apply {
-                action = ACTION_START_SCAN
-            }
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            try {
+                val intent = Intent(context, ScanForegroundService::class.java).apply {
+                    action = ACTION_START_SCAN
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to start ScanForegroundService: ${e.message}", e)
             }
         }
 

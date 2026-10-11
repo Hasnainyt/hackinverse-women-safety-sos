@@ -103,7 +103,9 @@ class MainActivity : ComponentActivity() {
                     )
 
                     // Handle intent when opened from Alert Notification
-                    handleNotificationIntent(intent, navController)
+                    LaunchedEffect(intent) {
+                        handleNotificationIntent(intent, navController)
+                    }
                 }
             }
         }
