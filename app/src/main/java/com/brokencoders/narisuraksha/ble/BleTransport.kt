@@ -7,6 +7,7 @@ data class ReceivedSos(val packet: SosPacket, val rssi: Int, val receivedAt: Lon
 
 interface BleTransport {
     fun startAdvertising(packet: SosPacket)
+    fun queueRelay(packet: SosPacket)
     fun stopAdvertising()
     fun startScanning()
     fun stopScanning()

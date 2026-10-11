@@ -20,6 +20,7 @@ data class SosPacket(
     val lat: Float,
     val lon: Float,
     val flags: Byte,
+    val ttl: Int = DEFAULT_TTL
 ) {
     val isSos: Boolean get() = (flags.toInt() and FLAG_SOS) != 0
     val isLocationUnavailable: Boolean get() = (flags.toInt() and FLAG_LOCATION_UNAVAILABLE) != 0
@@ -41,11 +42,38 @@ data class SosPacket(
     val targetSenderId: Short
         get() = if (isAck) (timestamp and 0xFFFF).toShort() else 0
 
+    /**
+     * Calculated hop count from initial transmission (assuming default originating TTL).
+     */
+    val hopCount: Int
+        get() = (DEFAULT_TTL - ttl).coerceAtLeast(0)
+
+    /**
+     * Produces a copy of the packet with TTL decremented by 1, never going below 0.
+     */
+    fun withDecrementedTtl(): SosPacket {
+        val newTtl = (ttl - 1).coerceAtLeast(0)
+        return copy(ttl = newTtl)
+    }
+
+    /**
+     * Produces a relayed copy with TTL decremented by 1.
+     * Returns null if TTL is already 0 (cannot be forwarded further).
+     */
+    fun relayedCopy(): SosPacket? {
+        if (ttl <= 0) return null
+        return withDecrementedTtl()
+    }
+
     companion object {
+        const val DEFAULT_TTL: Int = Constants.DEFAULT_TTL
+        const val MAX_TTL: Int = Constants.MAX_TTL
+
         const val FLAG_SOS: Int = 1 shl 0
         const val FLAG_LOCATION_UNAVAILABLE: Int = 1 shl 1
         const val FLAG_ACK: Int = 1 shl 2
         const val FLAG_TEST: Int = 1 shl 3
+        const val FLAGS_MASK: Int = 0x0F
 
         private const val LAT_MIN = -90.0
         private const val LAT_MAX = 90.0
@@ -75,7 +103,8 @@ data class SosPacket(
             timestampSeconds: Int = (System.currentTimeMillis() / 1000L).toInt(),
             isAck: Boolean = false,
             targetSenderId: Short = 0,
-            isTest: Boolean = false
+            isTest: Boolean = false,
+            ttl: Int = DEFAULT_TTL
         ): SosPacket {
             // ---- Flags ----
             // ACK wins over TEST when both are set (test ACK is still an ACK,
@@ -122,7 +151,8 @@ data class SosPacket(
                 timestamp = finalTimestamp,
                 lat = finalLat,
                 lon = finalLon,
-                flags = flagAccumulator.toByte()
+                flags = flagAccumulator.toByte(),
+                ttl = ttl.coerceIn(0, MAX_TTL)
             )
         }
     }

@@ -20,6 +20,18 @@ class BleDiagnosticsTrackerTest {
         assertEquals(0, BleDiagnosticsTracker.acksSentCount.value)
         assertEquals(0, BleDiagnosticsTracker.acksReceivedCount.value)
         assertEquals(0, BleDiagnosticsTracker.rejectedPacketsCount.value)
+        assertEquals(0, BleDiagnosticsTracker.relayedCount.value)
+        assertEquals(0, BleDiagnosticsTracker.duplicatesDroppedCount.value)
+        org.junit.Assert.assertNull(BleDiagnosticsTracker.lastReceivedTtl.value)
+    }
+
+    @Test
+    fun testLastReceivedTtlTracking() {
+        org.junit.Assert.assertNull(BleDiagnosticsTracker.lastReceivedTtl.value)
+        BleDiagnosticsTracker.setLastReceivedTtl(3)
+        assertEquals(3, BleDiagnosticsTracker.lastReceivedTtl.value)
+        BleDiagnosticsTracker.clearLogs()
+        org.junit.Assert.assertNull(BleDiagnosticsTracker.lastReceivedTtl.value)
     }
 
     @Test
@@ -40,6 +52,13 @@ class BleDiagnosticsTrackerTest {
 
         BleDiagnosticsTracker.incrementRejectedPackets()
         assertEquals(1, BleDiagnosticsTracker.rejectedPacketsCount.value)
+
+        BleDiagnosticsTracker.incrementRelayed()
+        assertEquals(1, BleDiagnosticsTracker.relayedCount.value)
+
+        BleDiagnosticsTracker.incrementDuplicatesDropped()
+        BleDiagnosticsTracker.incrementDuplicatesDropped()
+        assertEquals(2, BleDiagnosticsTracker.duplicatesDroppedCount.value)
     }
 
     @Test

@@ -15,13 +15,17 @@ import {
   XCircle,
   WifiOff,
   Navigation,
-  Activity
+  Activity,
+  Calculator
 } from 'lucide-react'
 import { useI18n } from '../i18n'
 
 export default function InteractiveSimulator() {
   const i18n = useI18n()
   const t = i18n.simulator
+
+  // Mode on Phone A: 'sos' | 'decoy'
+  const [activeMode, setActiveMode] = useState('sos')
 
   // Simulation State
   // 'idle' | 'countdown' | 'hop1_sending' | 'hop1_reached' | 'hop2_sending' | 'hop2_reached' | 'ack_sending' | 'ack_delivered'
@@ -38,6 +42,11 @@ export default function InteractiveSimulator() {
   const [isAckSent, setIsAckSent] = useState(false)
   const [isSirenOn, setIsSirenOn] = useState(false)
   const [isTorchOn, setIsTorchOn] = useState(false)
+
+  // Decoy Calculator State
+  const [calcDisplay, setCalcDisplay] = useState('0')
+  const [calcInputHistory, setCalcInputHistory] = useState('')
+  const [secretPin, setSecretPin] = useState('1234')
 
   // Countdown timer for Phone A
   useEffect(() => {
@@ -109,11 +118,47 @@ export default function InteractiveSimulator() {
     setIsAckSent(false)
     setIsSirenOn(false)
     setIsTorchOn(false)
+    setCalcDisplay('0')
+    setCalcInputHistory('')
   }
 
   const handleSendAck = () => {
     setIsAckSent(true)
     setStage('ack_sending')
+  }
+
+  // Calculator interaction
+  const handleCalcBtn = (val) => {
+    if (val === 'C') {
+      setCalcDisplay('0')
+      setCalcInputHistory('')
+      return
+    }
+    if (val === '=') {
+      if (calcDisplay === secretPin || calcInputHistory.endsWith(secretPin)) {
+        setActiveMode('sos')
+        handleStartSos()
+        return
+      }
+      try {
+        const clean = calcDisplay.replace(/×/g, '*').replace(/÷/g, '/')
+        if (/^[0-9+\-*/. %()]+$/.test(clean)) {
+          const res = new Function(`return (${clean})`)()
+          setCalcDisplay(String(res))
+        } else {
+          setCalcDisplay('Error')
+        }
+      } catch (e) {
+        setCalcDisplay('Error')
+      }
+      return
+    }
+    setCalcInputHistory((prev) => prev + val)
+    if (calcDisplay === '0' || calcDisplay === 'Error') {
+      setCalcDisplay(val)
+    } else {
+      setCalcDisplay((prev) => prev + val)
+    }
   }
 
   const isBroadcasting = ['hop1_sending', 'hop1_reached', 'hop2_sending', 'hop2_reached', 'ack_sending', 'ack_delivered'].includes(stage)
@@ -222,125 +267,190 @@ export default function InteractiveSimulator() {
               <span className="w-2.5 h-2.5 rounded-full bg-pink-primary" />
               <span className="text-ink-primary font-black">{t.phoneA.title}</span>
             </div>
-            <span className="px-2 py-0.5 rounded-full bg-pink-soft text-pink-primary text-[11px] font-bold">
-              {t.phoneA.role}
-            </span>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setActiveMode(activeMode === 'sos' ? 'decoy' : 'sos')}
+                className="px-2 py-0.5 rounded-full bg-pink-soft text-pink-primary text-[11px] font-bold hover:bg-pink-soft/80 flex items-center gap-1 transition-all"
+                title="Toggle between SOS Button and Decoy Calculator"
+              >
+                {activeMode === 'sos' ? (
+                  <>
+                    <Calculator className="w-3 h-3" />
+                    <span>Decoy</span>
+                  </>
+                ) : (
+                  <>
+                    <Shield className="w-3 h-3" />
+                    <span>SOS</span>
+                  </>
+                )}
+              </button>
+              <span className="px-2 py-0.5 rounded-full bg-pink-soft text-pink-primary text-[11px] font-bold">
+                {t.phoneA.role}
+              </span>
+            </div>
           </div>
 
           {/* Screen Content */}
-          <div className="flex-1 flex flex-col justify-between py-6 space-y-5">
-            
-            {stage === 'idle' && (
-              <div className="flex flex-col items-center justify-center py-6 text-center space-y-6">
-                {/* 160px Centered Solid Pink SOS Button */}
-                <button
-                  onClick={handleStartSos}
-                  className="w-40 h-40 rounded-full bg-pink-primary active:bg-pink-pressed text-white shadow-pink-action hover:scale-105 active:scale-95 transition-all flex flex-col items-center justify-center border-4 border-white"
-                >
-                  <Shield className="w-12 h-12 text-white" />
-                  <span className="text-sm font-extrabold tracking-wider mt-2">
-                    {t.phoneA.holdForHelp}
-                  </span>
-                </button>
-
-                <div className="space-y-1">
-                  <p className="text-sm font-bold text-ink-primary">
-                    1-Tap Offline Distress Trigger
+          {activeMode === 'decoy' ? (
+            <div className="flex-1 flex flex-col justify-between py-4 space-y-4">
+              <div className="bg-[#1E1E1E] rounded-2xl p-4 text-white shadow-inner max-w-[260px] mx-auto w-full space-y-3">
+                <div className="text-right pb-1 border-b border-gray-700">
+                  <p className="text-[10px] text-gray-400 font-mono">Calculator Disguise</p>
+                  <div className="text-2xl font-light font-mono py-1 tracking-wider overflow-hidden">{calcDisplay}</div>
+                </div>
+                <div className="grid grid-cols-4 gap-2 text-xs font-semibold">
+                  {['C', '%', '÷', '×', '7', '8', '9', '-', '4', '5', '6', '+', '1', '2', '3', '='].map((btn) => (
+                    <button
+                      key={btn}
+                      onClick={() => handleCalcBtn(btn)}
+                      className={`h-9 rounded-xl flex items-center justify-center font-bold text-sm transition-all active:scale-95 ${
+                        btn === '='
+                          ? 'bg-pink-primary hover:bg-pink-primary/90 text-white font-extrabold col-span-1 shadow-sm'
+                          : btn === 'C'
+                          ? 'bg-gray-700 hover:bg-gray-600 text-status-amber'
+                          : ['%', '÷', '×', '-', '+'].includes(btn)
+                          ? 'bg-gray-700 hover:bg-gray-600 text-pink-primary'
+                          : 'bg-[#333333] hover:bg-[#444444] text-white'
+                      }`}
+                    >
+                      {btn}
+                    </button>
+                  ))}
+                </div>
+                <div className="bg-white/5 rounded-xl p-2 text-center border border-white/10 space-y-0.5">
+                  <p className="text-[10px] font-bold text-pink-300">
+                    💡 Disguise Demo: Enter PIN <strong>1234</strong> then <strong>=</strong>
                   </p>
-                  <p className="text-xs text-ink-secondary">
-                    Requires zero internet, SIM card, or pairing.
+                  <p className="text-[9px] text-gray-400">
+                    Silently triggers offline SOS beacon
                   </p>
                 </div>
               </div>
-            )}
 
-            {stage === 'countdown' && (
-              <div className="flex flex-col items-center justify-center py-6 text-center space-y-5">
-                <div className="w-28 h-28 rounded-full bg-status-danger text-white flex items-center justify-center text-5xl font-black shadow-lg animate-pulse">
-                  {countdown}
-                </div>
-                <div className="space-y-1">
-                  <p className="text-base font-extrabold text-status-danger">
-                    {t.phoneA.countdown} {countdown}s
-                  </p>
-                  <p className="text-xs text-ink-secondary">
-                    Capturing offline GPS coordinates...
-                  </p>
-                </div>
-                <button
-                  onClick={handleCancel}
-                  className="w-full py-3.5 rounded-btn bg-white border-2 border-pink-border text-ink-primary font-bold text-sm hover:bg-pink-soft transition-all"
-                >
-                  {t.phoneA.cancel}
-                </button>
+              {/* Bottom Status Chips */}
+              <div className="flex items-center justify-between text-xs font-bold pt-3 border-t border-pink-border text-ink-secondary">
+                <span className="flex items-center gap-1 text-status-safe">
+                  <span className="w-2 h-2 rounded-full bg-status-safe" />
+                  Disguised App Active
+                </span>
+                <span>Background BLE Ready</span>
               </div>
-            )}
-
-            {isBroadcasting && (
-              <div className="space-y-4">
-                {/* Broadcasting Status Pill */}
-                <div className="flex items-center justify-between px-3.5 py-2 rounded-2xl bg-status-danger/10 border border-status-danger text-status-danger">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-status-danger animate-ping" />
-                    <span className="text-xs font-black uppercase tracking-wide">
-                      {t.phoneA.broadcasting}
-                    </span>
-                  </div>
-                  <span className="text-[11px] font-mono font-bold">17 Bytes</span>
-                </div>
-
-                <div className="bg-white rounded-2xl p-4 border border-pink-border space-y-1">
-                  <p className="text-sm font-bold text-ink-primary">
-                    Help is being alerted. Stay calm.
-                  </p>
-                  <p className="text-xs text-ink-secondary">
-                    {t.phoneA.meshLine}
-                  </p>
-                </div>
-
-                {/* Live Responder Counter Card */}
-                <div className={`p-4 rounded-2xl border-2 transition-all ${
-                  responderCount > 0
-                    ? 'bg-status-safe/10 border-status-safe text-status-safe'
-                    : 'bg-pink-soft border-pink-border text-ink-primary'
-                }`}>
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white ${
-                      responderCount > 0 ? 'bg-status-safe' : 'bg-pink-primary'
-                    }`}>
-                      {responderCount > 0 ? <CheckCircle className="w-5 h-5" /> : <Shield className="w-5 h-5" />}
-                    </div>
-                    <div>
-                      <p className="text-sm font-black">
-                        {responderCount > 0 ? t.phoneA.respondersActive : t.phoneA.respondersZero}
-                      </p>
-                      <p className="text-xs opacity-80">
-                        {responderCount > 0 ? t.phoneA.ackNotice : 'Listening for 2-way ACK beacons...'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* "I'm Safe" Button */}
-                <button
-                  onClick={handleReset}
-                  className="w-full py-3.5 rounded-btn bg-status-safe text-white font-extrabold text-sm hover:opacity-90 shadow-sm transition-all"
-                >
-                  {t.phoneA.imSafe}
-                </button>
-              </div>
-            )}
-
-            {/* Bottom Status Chips */}
-            <div className="flex items-center justify-between text-xs font-bold pt-3 border-t border-pink-border text-ink-secondary">
-              <span className="flex items-center gap-1 text-status-safe">
-                <span className="w-2 h-2 rounded-full bg-status-safe" />
-                Bluetooth ON
-              </span>
-              <span>GPS: 28.6139, 77.2090</span>
             </div>
+          ) : (
+            <div className="flex-1 flex flex-col justify-between py-6 space-y-5">
+              {stage === 'idle' && (
+                <div className="flex flex-col items-center justify-center py-6 text-center space-y-6">
+                  {/* 160px Centered Solid Pink SOS Button */}
+                  <button
+                    onClick={handleStartSos}
+                    className="w-40 h-40 rounded-full bg-pink-primary active:bg-pink-pressed text-white shadow-pink-action hover:scale-105 active:scale-95 transition-all flex flex-col items-center justify-center border-4 border-white"
+                  >
+                    <Shield className="w-12 h-12 text-white" />
+                    <span className="text-sm font-extrabold tracking-wider mt-2">
+                      {t.phoneA.holdForHelp}
+                    </span>
+                  </button>
 
-          </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-bold text-ink-primary">
+                      1-Tap Offline Distress Trigger
+                    </p>
+                    <p className="text-xs text-ink-secondary">
+                      Requires zero internet, SIM card, or pairing.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {stage === 'countdown' && (
+                <div className="flex flex-col items-center justify-center py-6 text-center space-y-5">
+                  <div className="w-28 h-28 rounded-full bg-status-danger text-white flex items-center justify-center text-5xl font-black shadow-lg animate-pulse">
+                    {countdown}
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-base font-extrabold text-status-danger">
+                      {t.phoneA.countdown} {countdown}s
+                    </p>
+                    <p className="text-xs text-ink-secondary">
+                      Capturing offline GPS coordinates...
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleCancel}
+                    className="w-full py-3.5 rounded-btn bg-white border-2 border-pink-border text-ink-primary font-bold text-sm hover:bg-pink-soft transition-all"
+                  >
+                    {t.phoneA.cancel}
+                  </button>
+                </div>
+              )}
+
+              {isBroadcasting && (
+                <div className="space-y-4">
+                  {/* Broadcasting Status Pill */}
+                  <div className="flex items-center justify-between px-3.5 py-2 rounded-2xl bg-status-danger/10 border border-status-danger text-status-danger">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-status-danger animate-ping" />
+                      <span className="text-xs font-black uppercase tracking-wide">
+                        {t.phoneA.broadcasting}
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-mono font-bold">17 Bytes</span>
+                  </div>
+
+                  <div className="bg-white rounded-2xl p-4 border border-pink-border space-y-1">
+                    <p className="text-sm font-bold text-ink-primary">
+                      Help is being alerted. Stay calm.
+                    </p>
+                    <p className="text-xs text-ink-secondary">
+                      {t.phoneA.meshLine}
+                    </p>
+                  </div>
+
+                  {/* Live Responder Counter Card */}
+                  <div className={`p-4 rounded-2xl border-2 transition-all ${
+                    responderCount > 0
+                      ? 'bg-status-safe/10 border-status-safe text-status-safe'
+                      : 'bg-pink-soft border-pink-border text-ink-primary'
+                  }`}>
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white ${
+                        responderCount > 0 ? 'bg-status-safe' : 'bg-pink-primary'
+                      }`}>
+                        {responderCount > 0 ? <CheckCircle className="w-5 h-5" /> : <Shield className="w-5 h-5" />}
+                      </div>
+                      <div>
+                        <p className="text-sm font-black">
+                          {responderCount > 0 ? t.phoneA.respondersActive : t.phoneA.respondersZero}
+                        </p>
+                        <p className="text-xs opacity-80">
+                          {responderCount > 0 ? t.phoneA.ackNotice : 'Listening for 2-way ACK beacons...'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* "I'm Safe" Button */}
+                  <button
+                    onClick={handleReset}
+                    className="w-full py-3.5 rounded-btn bg-status-safe text-white font-extrabold text-sm hover:opacity-90 shadow-sm transition-all"
+                  >
+                    {t.phoneA.imSafe}
+                  </button>
+                </div>
+              )}
+
+              {/* Bottom Status Chips */}
+              <div className="flex items-center justify-between text-xs font-bold pt-3 border-t border-pink-border text-ink-secondary">
+                <span className="flex items-center gap-1 text-status-safe">
+                  <span className="w-2 h-2 rounded-full bg-status-safe" />
+                  Bluetooth ON
+                </span>
+                <span>GPS: 28.6139, 77.2090</span>
+              </div>
+
+            </div>
+          )}
 
           {/* Animated Packet Arrow to Phone B (Visible on Desktop) */}
           <div className="hidden lg:flex absolute -right-4 top-1/2 -translate-y-1/2 z-20">

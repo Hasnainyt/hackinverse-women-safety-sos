@@ -322,6 +322,22 @@ class MainViewModel(
     }
 
     /**
+     * Injects a synthetic incoming SOS packet for emulator validation.
+     */
+    fun injectSimulatedSosPacket() {
+        val simulatedSenderId = ((deviceIdProvider.deviceId.toInt() + 101) and 0x7FFF).toShort()
+        val packet = SosPacket(
+            senderId = simulatedSenderId,
+            timestamp = (System.currentTimeMillis() / 1000).toInt(),
+            lat = 28.6139f,
+            lon = 77.2090f,
+            flags = SosPacket.FLAG_SOS.toByte(),
+            ttl = 3 // 1 hop via mesh relay
+        )
+        bleScanner.injectSimulatedPacket(packet)
+    }
+
+    /**
      * Injects a simulated SOS packet into the UI and BLE diagnostics for emulator/demo validation.
      * Safe for debug environments where a second physical transmitter is unavailable.
      */

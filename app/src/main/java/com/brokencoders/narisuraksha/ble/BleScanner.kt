@@ -15,10 +15,15 @@ import android.util.Log
 import com.brokencoders.narisuraksha.core.Constants
 import com.brokencoders.narisuraksha.core.DeviceIdProvider
 import com.brokencoders.narisuraksha.core.PermissionHelper
+import com.brokencoders.narisuraksha.core.SosPacket
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 
@@ -29,7 +34,8 @@ import java.util.concurrent.ConcurrentLinkedQueue
  */
 class BleScanner(
     private val context: Context,
-    private val deviceIdProvider: DeviceIdProvider
+    private val deviceIdProvider: DeviceIdProvider,
+    private val externalScope: CoroutineScope = CoroutineScope(Dispatchers.Default)
 ) {
     private val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
     private val bluetoothAdapter: BluetoothAdapter? get() = bluetoothManager?.adapter
@@ -47,9 +53,17 @@ class BleScanner(
 
     private var fallbackScanAttempted = false
 
-    // Maps to rate-limit and dedupe packets: key = senderId (Short), value = last received system time
+    /** RelayDedupCache with 60-second expiration */
+    val dedupCache = RelayDedupCache()
+
+    /** Budget tracker enforcing MESH_MAX_RELAYS_PER_MIN */
+    private val relayBudgetTracker = RelayBudgetTracker()
+
+    /** Callback invoked when a packet is scheduled for mesh relay forwarding */
+    var relayHandler: ((SosPacket) -> Unit)? = null
+
+    // Per-sender cooldown map
     private val senderLastSeenMap = ConcurrentHashMap<Short, Long>()
-    private val packetDedupeMap = ConcurrentHashMap<String, Long>()
     // Sliding window of alert timestamps across all senders (global rate limit against spoofed ID rotations)
     private val globalAlertTimestamps = ConcurrentLinkedQueue<Long>()
 
@@ -133,23 +147,123 @@ class BleScanner(
             return
         }
 
-        // Ignore our own broadcasted packets
-        if (packet.senderId == deviceIdProvider.deviceId) {
-            return
+        val now = System.currentTimeMillis()
+
+        val decision = RelayPolicy.evaluate(
+            packet = packet,
+            myDeviceId = deviceIdProvider.deviceId,
+            cache = dedupCache,
+            canRelayBudget = { relayBudgetTracker.tryAcquire() }
+        )
+
+        if (decision != RelayDecision.IGNORE_OWN) {
+            BleDiagnosticsTracker.setLastReceivedTtl(packet.ttl)
         }
 
-        val now = System.currentTimeMillis()
-        val dedupeKey = "${packet.senderId}:${packet.timestamp}"
-        val lastSeenForPacket = packetDedupeMap[dedupeKey]
-        val lastSeenForSender = senderLastSeenMap[packet.senderId]
+        when (decision) {
+            RelayDecision.IGNORE_OWN -> return
 
-        // Clean up old entries (> 3 minutes)
-        if (packetDedupeMap.size > 200) {
-            packetDedupeMap.entries.removeIf { now - it.value > 180_000L }
+            RelayDecision.DROP_DUPLICATE -> {
+                BleDiagnosticsTracker.incrementDuplicatesDropped()
+                BleDiagnosticsTracker.recordEvent(
+                    "NARI_BLE_DUPLICATE_DROPPED",
+                    "DROP dup sender=${packet.senderId}"
+                )
+                return
+            }
+
+            RelayDecision.RELAY_ONLY -> {
+                scheduleRelay(packet)
+                return
+            }
+
+            RelayDecision.ALERT_AND_RELAY -> {
+                scheduleRelay(packet)
+                processLocalAlert(packet, result.rssi, now)
+            }
+
+            RelayDecision.ALERT_ONLY -> {
+                processLocalAlert(packet, result.rssi, now)
+            }
+
+            RelayDecision.CONSUME_ACK_FOR_ME -> {
+                BleDiagnosticsTracker.incrementAcksReceived()
+                BleDiagnosticsTracker.recordEvent(
+                    "NARI_BLE_ACK_RECEIVED",
+                    "RX sender=${packet.senderId} ttl=${packet.ttl} rssi=${result.rssi}"
+                )
+                val receivedSos = ReceivedSos(packet = packet, rssi = result.rssi, receivedAt = now)
+                _received.tryEmit(receivedSos)
+            }
+        }
+    }
+
+    /**
+     * Injects a simulated packet directly into the scanner pipeline.
+     * Useful for emulator testing where Bluetooth hardware is unavailable.
+     */
+    fun injectSimulatedPacket(packet: SosPacket, rssi: Int = -65) {
+        val now = System.currentTimeMillis()
+        val decision = RelayPolicy.evaluate(
+            packet = packet,
+            myDeviceId = deviceIdProvider.deviceId,
+            cache = dedupCache,
+            canRelayBudget = { relayBudgetTracker.tryAcquire() }
+        )
+
+        if (decision != RelayDecision.IGNORE_OWN) {
+            BleDiagnosticsTracker.setLastReceivedTtl(packet.ttl)
+        }
+
+        when (decision) {
+            RelayDecision.IGNORE_OWN -> return
+            RelayDecision.DROP_DUPLICATE -> {
+                BleDiagnosticsTracker.incrementDuplicatesDropped()
+                BleDiagnosticsTracker.recordEvent(
+                    "NARI_BLE_DUPLICATE_DROPPED",
+                    "DROP dup sender=${packet.senderId}"
+                )
+            }
+            RelayDecision.RELAY_ONLY -> scheduleRelay(packet)
+            RelayDecision.ALERT_AND_RELAY -> {
+                scheduleRelay(packet)
+                processLocalAlert(packet, rssi, now)
+            }
+            RelayDecision.ALERT_ONLY -> processLocalAlert(packet, rssi, now)
+            RelayDecision.CONSUME_ACK_FOR_ME -> {
+                BleDiagnosticsTracker.incrementAcksReceived()
+                BleDiagnosticsTracker.recordEvent(
+                    "NARI_BLE_ACK_RECEIVED",
+                    "RX sender=${packet.senderId} ttl=${packet.ttl} rssi=$rssi"
+                )
+                val receivedSos = ReceivedSos(packet = packet, rssi = rssi, receivedAt = now)
+                _received.tryEmit(receivedSos)
+            }
+        }
+    }
+
+    private fun scheduleRelay(packet: SosPacket) {
+        val relayedPacket = packet.withDecrementedTtl()
+        val delayMs = kotlin.random.Random.nextLong(
+            Constants.MESH_RELAY_DELAY_MIN_MS,
+            Constants.MESH_RELAY_DELAY_MAX_MS + 1
+        )
+        BleDiagnosticsTracker.recordEvent("NARI_BLE_RELAY", "RELAY ttl=${relayedPacket.ttl}")
+        BleDiagnosticsTracker.incrementRelayed()
+
+        externalScope.launch {
+            delay(delayMs)
+            relayHandler?.invoke(relayedPacket)
+        }
+    }
+
+    private fun processLocalAlert(packet: SosPacket, rssi: Int, now: Long) {
+        // Clean up per-sender cooldown map periodically
+        if (senderLastSeenMap.size > 200) {
             senderLastSeenMap.entries.removeIf { now - it.value > 180_000L }
         }
 
-        // Rate-limiting for distress broadcasts (does NOT suppress ACKs or Test packets)
+        // Rate-limiting for local distress alerts (does NOT affect mesh relay forwarding)
         if (!packet.isAck && !packet.isTest) {
             // Global alert rate limit
             val windowStart = now - Constants.GLOBAL_ALERT_RATE_LIMIT_WINDOW_MS
@@ -166,46 +280,25 @@ class BleScanner(
             }
 
             // Per-sender cooldown (10s)
+            val lastSeenForSender = senderLastSeenMap[packet.senderId]
             if (lastSeenForSender != null && (now - lastSeenForSender < Constants.PACKET_RATE_LIMIT_MS)) {
                 BleDiagnosticsTracker.incrementRejectedPackets()
                 return
             }
-        }
 
-        // Dedupe identical packets within 4 seconds (unless ACK targeting this device)
-        if (lastSeenForPacket != null && (now - lastSeenForPacket < 4_000L) && !packet.isAck) {
-            return
-        }
-
-        if (!packet.isAck && !packet.isTest) {
             globalAlertTimestamps.add(now)
+            senderLastSeenMap[packet.senderId] = now
         }
 
-        packetDedupeMap[dedupeKey] = now
-        senderLastSeenMap[packet.senderId] = now
-
-        if (packet.isAck) {
-            BleDiagnosticsTracker.incrementAcksReceived()
-            BleDiagnosticsTracker.recordEvent(
-                "NARI_BLE_ACK_RECEIVED",
-                "ACK from #${packet.senderId} targeting #${packet.targetSenderId} | RSSI: ${result.rssi} dBm"
-            )
-        } else {
-            BleDiagnosticsTracker.incrementPacketsReceived()
-            val label = if (packet.isTest) "TEST SOS" else "DISTRESS SOS"
-            BleDiagnosticsTracker.recordEvent(
-                "NARI_BLE_PACKET_RECEIVED",
-                "$label from #${packet.senderId} | RSSI: ${result.rssi} dBm | lat=${packet.lat}, lon=${packet.lon}"
-            )
-        }
-
-        Log.i(TAG, "Decoded valid SOS packet from sender ${packet.senderId}, RSSI: ${result.rssi} dBm, isAck: ${packet.isAck}, isTest: ${packet.isTest}")
-
-        val receivedSos = ReceivedSos(
-            packet = packet,
-            rssi = result.rssi,
-            receivedAt = now
+        BleDiagnosticsTracker.incrementPacketsReceived()
+        val tag = if (packet.isTest) "NARI_BLE_TEST_RECEIVED" else "NARI_BLE_PACKET_RECEIVED"
+        BleDiagnosticsTracker.recordEvent(
+            tag,
+            "RX sender=${packet.senderId} ttl=${packet.ttl} rssi=$rssi"
         )
+
+        Log.i(TAG, "Delivered SOS alert from sender ${packet.senderId}, RSSI: $rssi dBm, TTL: ${packet.ttl}")
+        val receivedSos = ReceivedSos(packet = packet, rssi = rssi, receivedAt = now)
         _received.tryEmit(receivedSos)
     }
 
@@ -248,9 +341,11 @@ class BleScanner(
             index += 1 + length
         }
 
-        // Direct pattern fallback: scan for magic byte 0x53 ('S') followed by version 0x01
+        // Direct pattern fallback: scan for magic byte 0x53 ('S') followed by version 0x01 or 0x02
         for (i in 0..(raw.size - PacketCodec.PACKET_SIZE_BYTES)) {
-            if (raw[i] == PacketCodec.MAGIC_BYTE && raw[i + 1] == PacketCodec.PROTOCOL_VERSION) {
+            if (raw[i] == PacketCodec.MAGIC_BYTE &&
+                (raw[i + 1] == PacketCodec.PROTOCOL_VERSION_V1 || raw[i + 1] == PacketCodec.PROTOCOL_VERSION_V2)
+            ) {
                 val candidate = ByteArray(PacketCodec.PACKET_SIZE_BYTES)
                 System.arraycopy(raw, i, candidate, 0, candidate.size)
                 return candidate

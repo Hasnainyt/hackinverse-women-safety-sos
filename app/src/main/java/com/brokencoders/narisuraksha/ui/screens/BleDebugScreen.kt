@@ -115,6 +115,9 @@ fun BleDebugScreen(
     val acksSent by viewModel.bleDiagnostics.acksSentCount.collectAsState()
     val acksReceived by viewModel.bleDiagnostics.acksReceivedCount.collectAsState()
     val rejectedPackets by viewModel.bleDiagnostics.rejectedPacketsCount.collectAsState()
+    val relayed by viewModel.bleDiagnostics.relayedCount.collectAsState()
+    val duplicatesDropped by viewModel.bleDiagnostics.duplicatesDroppedCount.collectAsState()
+    val lastReceivedTtl by viewModel.bleDiagnostics.lastReceivedTtl.collectAsState()
     val debugScanMode by viewModel.bleDiagnostics.debugScanModeEnabled.collectAsState()
     val logs by viewModel.bleDiagnostics.logs.collectAsState()
     val isTestBroadcasting by viewModel.isTestBroadcasting.collectAsState()
@@ -319,7 +322,7 @@ fun BleDebugScreen(
                         Box(modifier = Modifier.weight(1f)) {
                             CounterTile(
                                 title = stringResource(R.string.relays_sched),
-                                count = 0, // Direct 1-hop link protocol
+                                count = relayed,
                                 icon = Icons.Default.Share,
                                 color = GuardianBlue,
                                 isDemoScale = isDemoView
@@ -328,7 +331,7 @@ fun BleDebugScreen(
                         Box(modifier = Modifier.weight(1f)) {
                             CounterTile(
                                 title = stringResource(R.string.dup_dropped),
-                                count = rejectedPackets,
+                                count = duplicatesDropped,
                                 icon = Icons.Default.Warning,
                                 color = WarningAmber,
                                 isDemoScale = isDemoView
@@ -344,7 +347,7 @@ fun BleDebugScreen(
                         Box(modifier = Modifier.weight(1f)) {
                             CounterTile(
                                 title = stringResource(R.string.last_ttl),
-                                count = 1,
+                                count = lastReceivedTtl ?: 0,
                                 icon = Icons.Default.Timer,
                                 color = GuardianBlue,
                                 isDemoScale = isDemoView
@@ -509,6 +512,58 @@ fun BleDebugScreen(
                             isGranted = locGranted,
                             onFix = { openAppSettings(context) }
                         )
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Debug scan mode toggle
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Debug Scan Mode (Software Filtering)",
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                    color = TextPrimary
+                                )
+                                Text(
+                                    text = "Bypasses strict OEM hardware filters to guarantee discovery across Qualcomm/MediaTek",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = TextMuted
+                                )
+                            }
+                            Switch(
+                                checked = debugScanMode,
+                                onCheckedChange = { viewModel.toggleDebugScanMode(it) },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = SafeGreen,
+                                    checkedTrackColor = SafeGreen.copy(alpha = 0.3f)
+                                )
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(
+                                onClick = { viewModel.restartBleScan() },
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Restart Scanner", fontSize = 12.sp)
+                            }
+                            OutlinedButton(
+                                onClick = { viewModel.bleDiagnostics.clearLogs() },
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Default.Clear, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Clear Logs", fontSize = 12.sp)
+                            }
+                        }
                     }
                 }
             }

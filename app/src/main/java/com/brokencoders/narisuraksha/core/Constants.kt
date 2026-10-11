@@ -36,6 +36,22 @@ object Constants {
     const val GLOBAL_ALERT_RATE_LIMIT_MAX_PER_MINUTE = 10
     const val GLOBAL_ALERT_RATE_LIMIT_WINDOW_MS = 60_000L
 
+    // Mesh & Relay configuration
+    const val MESH_DEFAULT_TTL = 4
+    const val DEFAULT_TTL = MESH_DEFAULT_TTL
+    const val MAX_TTL = 15
+    const val MESH_RELAY_DELAY_MIN_MS = 200L
+    const val RELAY_RANDOM_DELAY_MIN_MS = MESH_RELAY_DELAY_MIN_MS
+    const val MESH_RELAY_DELAY_MAX_MS = 1500L
+    const val RELAY_RANDOM_DELAY_MAX_MS = MESH_RELAY_DELAY_MAX_MS
+    const val MESH_DEDUP_TTL_MS = 60_000L
+    const val RELAY_DEDUP_EXPIRY_MS = MESH_DEDUP_TTL_MS
+    const val MESH_DEDUP_MAX_ENTRIES = 256
+    const val MESH_RELAY_ADVERTISE_MS = 10_000L
+    const val RELAY_ADVERTISE_DURATION_MS = MESH_RELAY_ADVERTISE_MS
+    const val MESH_MAX_RELAYS_PER_MIN = 12
+    const val MAX_RELAYS_PER_MINUTE = MESH_MAX_RELAYS_PER_MIN
+
     // Notification Channel IDs
     const val CHANNEL_ALERT_ID = "nari_emergency_alert_channel"
     const val CHANNEL_ALERT_NAME = "Emergency Alerts"

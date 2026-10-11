@@ -10,6 +10,9 @@
         android:name="android.hardware.sensor.accelerometer"
         android:required="true" />
     <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+    <uses-feature
         android:name="android.hardware.camera.flash"
         android:required="false" />
 

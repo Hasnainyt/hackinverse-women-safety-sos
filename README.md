@@ -2,16 +2,16 @@
 > **"Network gayab, fir bhi help alive."**  
 > Offline-First Women's Safety & Peer-to-Peer Distress Broadcast System over Bluetooth Low Energy (BLE) with Decoy Mode, 2-Way Responder ACK, Emergency Contacts & Tactical Radar.
 
-[![Live Demo Web App](https://img.shields.io/badge/Live%20Demo-Vercel%20App-ff2d78?style=for-the-badge&logo=vercel&logoColor=white)](https://hackinverse-women-safety.vercel.app/)
-[![Download Android APK](https://img.shields.io/badge/Download-Android%20APK%20(18.6MB)-e91e63?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Hasnainyt/hackinverse-women-safety/raw/main/app/build/outputs/apk/debug/app-debug.apk)
-[![GitHub Repo](https://img.shields.io/badge/GitHub-Repository-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Hasnainyt/hackinverse-women-safety)
+[![Live Demo Web App](https://img.shields.io/badge/Live%20Demo-Vercel%20App-ff2d78?style=for-the-badge&logo=vercel&logoColor=white)](https://hackinverse-women-safety-sos-fronte.vercel.app/)
+[![Download Android APK](https://img.shields.io/badge/Download-Android%20APK%20(18.4MB)-e91e63?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Hasnainyt/hackinverse-women-safety-sos/raw/main/app-debug.apk)
+[![GitHub Repo](https://img.shields.io/badge/GitHub-Repository-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Hasnainyt/hackinverse-women-safety-sos)
 
 ---
 
 ## 🌐 Live Web Portal & Simulator
 
-👉 **[Launch Nari-Suraksha Live Web Hub (Vercel)](https://hackinverse-women-safety.vercel.app/)**  
-*(Experience the interactive 2-Phone BLE broadcast simulation, 3-second countdown, Decoy Calculator PIN trigger, and Emergency Contacts action directly in your browser. Note: This web portal is an illustrative demonstration — web browsers do not broadcast native BLE packets. Download the Android APK for real hardware radio testing).*
+👉 **[Launch Nari-Suraksha Live Web Hub (Vercel)](https://hackinverse-women-safety-sos-fronte.vercel.app/)**  
+*(Experience the interactive 3-Phone BLE multi-hop mesh simulation, 3-second countdown, Decoy Calculator PIN trigger, and Emergency Contacts action directly in your browser. Note: This web portal is an illustrative demonstration — web browsers do not broadcast native BLE packets. Download the Android APK for real hardware radio testing).*
 
 ---
 
@@ -19,7 +19,7 @@
 
 You can download and install the ready-to-run Android APK directly onto your phone:
 
-👉 **[📥 Download Nari-Suraksha Debug APK (`app-debug.apk`)](https://github.com/Hasnainyt/hackinverse-women-safety/raw/main/app/build/outputs/apk/debug/app-debug.apk)**
+👉 **[📥 Download Nari-Suraksha Debug APK (`app-debug.apk`)](https://github.com/Hasnainyt/hackinverse-women-safety-sos/raw/main/app-debug.apk)**
 
 ### 📲 How to Install:
 1. **Download `app-debug.apk`** on your Android phone using the direct download link above (or transfer via WhatsApp, Telegram, or USB).
@@ -39,6 +39,12 @@ Using autonomous peer-to-peer **Bluetooth Low Energy (BLE) broadcasting**, an em
 ## 🚀 Key Features
 
 - 📴 **100% Offline Peer-to-Peer BLE Network**: Autonomous BLE advertisement using 16-bit Service UUID (`0xFDE1`) fitting within standard legacy 31-byte BLE packets (17-byte wire payload: `magic`, `version`, `senderId`, `timestamp/targetId`, `lat`, `lon`, `flags`).
+- 🌐 **Autonomous Multi-Hop Flooding Mesh Subsystem**:
+  - **Protocol V2 with 4-bit TTL**: Packets carry a Time-To-Live (default 3 hops) in the flags byte nibble, tripling signal range (~150m) across intermediary bystander phones.
+  - **Deterministic Relay Engine**: Drops own packets, drops expired packets (`TTL <= 1`), and enforces a strict 12-relay/min battery budget.
+  - **Bounded LRU Dedup Cache**: 60-second deduplication cache prevents re-broadcast loops and broadcast storms.
+  - **Collision-Mitigating Jitter (200–1500ms)**: Randomized scheduling prevents RF transmission collisions across adjacent receivers.
+  - **Advertiser Priority Queue**: Strict prioritization (`OWN_SOS > OWN_ACK > RELAY`) ensuring active emergency beacons preempt background mesh relays.
 - ⚡ **Multi-Trigger SOS with 3-Second Confirmation**:
   - **1-Tap Pulsating Hero SOS Button** with tactile ring feedback.
   - **3-Shake Accelerometer Sensor**: Detects 3 rapid shakes (> 2.7g) within 2 seconds with a 3-second cooldown and 220ms debounce to prevent false alarms from table bumps.
@@ -171,11 +177,16 @@ The generated APK will be output at:
 
 ## 🧪 Automated Test Suite
 
-Nari-Suraksha includes an extensive unit test suite covering 21 automated tests across 5 test classes:
+Nari-Suraksha includes a battle-tested unit test suite covering **73 automated unit tests** across 12 test classes (100% pass rate):
 
 | Test Class | Test Case | Description |
 |---|---|---|
+| `MeshNetworkSimulationTest` | `testThreeNodeDiscreteEventMeshPropagation` | Full 3-node simulation: A (Victim) -> B (Relay) -> C (Responder) with TTL decrement & return ACK |
+| `RelayPolicyTest` | `testDeterministicForwardingAndRateBudget` | Forwarding rules, self-packet dropping, and 12-relays/min battery budget enforcement |
+| `RelayDedupCacheTest` | `testThreadSafeLruEvictionAndLoopPrevention` | 60-second sliding deduplication cache prevents packet forwarding storms |
+| `BleAdvertiserQueueTest` | `testPriorityQueuePreemption` | Verifies `OWN_SOS` (Priority 1) immediately preempts and cancels active mesh `RELAY` (Priority 3) |
 | `PacketCodecTest` | `testEncodeDecodeRoundTrip` | 17-byte wire packet serialization/deserialization symmetry |
+| `PacketCodecTest` | `testProtocolV2NibbleTtl` | Protocol V2 4-bit TTL bitmask flags verification |
 | `PacketCodecTest` | `testLegacy15ByteDecodeFallback` | Backwards compatibility with legacy unversioned packets |
 | `PacketCodecTest` | `testAckTargetSenderId` | Targeted ACK packet encoding and decoding |
 | `PacketCodecTest` | `testLocationUnavailableFlag` | Fallback encoding when GPS coordinates are unavailable |
