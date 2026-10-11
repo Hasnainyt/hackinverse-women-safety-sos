@@ -3,7 +3,7 @@
 > Offline-First Women's Safety & Multi-Hop BLE Mesh Distress System over Bluetooth Low Energy (BLE) with Decoy Mode, 2-Way Responder ACK, Emergency Contacts & Tactical Radar.
 
 [![Live Demo Web App](https://img.shields.io/badge/Live%20Demo-Vercel%20App-ff2d78?style=for-the-badge&logo=vercel&logoColor=white)](https://hackinverse-women-safety-sos-fronte.vercel.app/)
-[![Download Android APK](https://img.shields.io/badge/Download-Android%20APK%20(18.4MB)-e91e63?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Hasnainyt/hackinverse-women-safety-sos/raw/main/app-debug.apk)
+[![Download Android APK](https://img.shields.io/badge/Download-Android%20APK%20(18.3MB)-e91e63?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Hasnainyt/hackinverse-women-safety-sos/raw/main/app-debug.apk)
 [![GitHub Repo](https://img.shields.io/badge/GitHub-Repository-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Hasnainyt/hackinverse-women-safety-sos)
 
 ---

@@ -97,9 +97,9 @@ class SosForegroundService : Service() {
         try {
             bleTransport.startAdvertising(packet)
         } catch (e: SecurityException) {
-            Log.e(TAG, "SOS broadcast aborted: missing BLUETOOTH_ADVERTISE permission", e)
-            stopSelf()
-            return
+            Log.e(TAG, "BLE advertise aborted: missing BLUETOOTH_ADVERTISE permission (WiFi mesh and SMS continue)", e)
+        } catch (e: Exception) {
+            Log.e(TAG, "BLE advertise failed: ${e.message} (WiFi mesh and SMS continue)", e)
         }
         // Ensure device is scanning simultaneously so incoming responder ACKs are captured!
         try {

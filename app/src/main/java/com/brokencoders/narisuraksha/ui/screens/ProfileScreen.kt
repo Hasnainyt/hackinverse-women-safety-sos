@@ -455,6 +455,28 @@ fun ProfileScreen(
                             )
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Button(
+                        onClick = onNavigateToDecoy,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = SoftPinkSurface),
+                        shape = PillShape,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, PrimaryPink)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Calculate,
+                            contentDescription = null,
+                            tint = PrimaryPink,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Test Calculator Camouflage Screen",
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            color = PrimaryPink
+                        )
+                    }
                 }
             }
 
