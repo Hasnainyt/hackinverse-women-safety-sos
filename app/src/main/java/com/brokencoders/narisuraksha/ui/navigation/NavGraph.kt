@@ -123,7 +123,10 @@ fun NariSurakshaNavGraph(
                 onNavigateToContacts = { navController.navigate(Screen.EmergencyContacts.route) },
                 onNavigateToAlert = { senderId, lat, lon, rssi ->
                     navController.navigate(Screen.Alert.createRoute(senderId, lat, lon, rssi))
-                }
+                },
+                onNavigateToHome = { navController.navigate(Screen.Home.route) { launchSingleTop = true } },
+                onNavigateToCommunity = { navController.navigate(Screen.Community.route) { launchSingleTop = true } },
+                onNavigateToProfile = { navController.navigate(Screen.Profile.route) { launchSingleTop = true } }
             )
         }
 
@@ -136,7 +139,10 @@ fun NariSurakshaNavGraph(
 
         composable(Screen.SafeZones.route) {
             SafeZoneScreen(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onNavigateToHome = { navController.navigate(Screen.Home.route) { launchSingleTop = true } },
+                onNavigateToCommunity = { navController.navigate(Screen.Community.route) { launchSingleTop = true } },
+                onNavigateToProfile = { navController.navigate(Screen.Profile.route) { launchSingleTop = true } }
             )
         }
 
@@ -163,7 +169,10 @@ fun NariSurakshaNavGraph(
 
         composable(Screen.Community.route) {
             CommunityScreen(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onNavigateToHome = { navController.navigate(Screen.Home.route) { launchSingleTop = true } },
+                onNavigateToSafetyAlerts = { navController.navigate(Screen.SafetyAlerts.route) { launchSingleTop = true } },
+                onNavigateToProfile = { navController.navigate(Screen.Profile.route) { launchSingleTop = true } }
             )
         }
 
@@ -175,7 +184,11 @@ fun NariSurakshaNavGraph(
 
         composable(Screen.QuickRecord.route) {
             QuickRecordScreen(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onNavigateToHome = { navController.navigate(Screen.Home.route) { launchSingleTop = true } },
+                onNavigateToSafetyAlerts = { navController.navigate(Screen.SafetyAlerts.route) { launchSingleTop = true } },
+                onNavigateToCommunity = { navController.navigate(Screen.Community.route) { launchSingleTop = true } },
+                onNavigateToProfile = { navController.navigate(Screen.Profile.route) { launchSingleTop = true } }
             )
         }
 

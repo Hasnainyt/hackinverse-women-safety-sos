@@ -82,7 +82,11 @@ import kotlinx.coroutines.delay
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QuickRecordScreen(
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onNavigateToHome: () -> Unit = onBack,
+    onNavigateToSafetyAlerts: () -> Unit = {},
+    onNavigateToCommunity: () -> Unit = {},
+    onNavigateToProfile: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var isRecording by remember { mutableStateOf(false) }
@@ -148,7 +152,12 @@ fun QuickRecordScreen(
             AppBottomBar(
                 currentRoute = "quick_record",
                 onNavigate = { route ->
-                    if (route == "home") onBack()
+                    when (route) {
+                        "home" -> onNavigateToHome()
+                        "safety_alerts", "safety", "safe_zones" -> onNavigateToSafetyAlerts()
+                        "community" -> onNavigateToCommunity()
+                        "profile", "settings" -> onNavigateToProfile()
+                    }
                 }
             )
         },

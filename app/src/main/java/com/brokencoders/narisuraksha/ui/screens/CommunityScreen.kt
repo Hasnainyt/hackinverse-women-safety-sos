@@ -66,7 +66,10 @@ import com.brokencoders.narisuraksha.ui.theme.TextSecondary
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CommunityScreen(
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onNavigateToHome: () -> Unit = onBack,
+    onNavigateToSafetyAlerts: () -> Unit = {},
+    onNavigateToProfile: () -> Unit = {}
 ) {
     val communityFeeds = listOf(
         CommunityPost(
@@ -127,7 +130,11 @@ fun CommunityScreen(
             AppBottomBar(
                 currentRoute = "community",
                 onNavigate = { route ->
-                    if (route == "home") onBack()
+                    when (route) {
+                        "home" -> onNavigateToHome()
+                        "safety_alerts", "safety", "safe_zones" -> onNavigateToSafetyAlerts()
+                        "profile", "settings" -> onNavigateToProfile()
+                    }
                 }
             )
         },

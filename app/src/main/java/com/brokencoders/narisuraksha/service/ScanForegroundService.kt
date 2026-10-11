@@ -74,12 +74,6 @@ class ScanForegroundService : Service() {
         val sosDao = app.database.sosDao()
         val notificationHelper = app.notificationHelper
 
-        if (!com.brokencoders.narisuraksha.core.PermissionHelper.hasBluetoothPermissions(this)) {
-            Log.w(TAG, "Guardian scan aborted: Bluetooth permissions missing")
-            stopSelf()
-            return
-        }
-
         // WiFi mesh (primary long-range medium) listens alongside BLE.
         // It idles silently when WiFi is unjoined — never a crash path.
         try {
@@ -88,11 +82,15 @@ class ScanForegroundService : Service() {
             Log.w(TAG, "WiFi mesh listener failed: ${e.message}")
         }
 
+        if (!com.brokencoders.narisuraksha.core.PermissionHelper.hasBluetoothPermissions(this)) {
+            Log.w(TAG, "Guardian BLE scan skipped: Bluetooth permissions missing (WiFi mesh continues)")
+            return
+        }
+
         try {
             bleTransport.startScanning()
         } catch (e: SecurityException) {
             Log.e(TAG, "Guardian scan aborted: missing BLE permission", e)
-            stopSelf()
             return
         }
 

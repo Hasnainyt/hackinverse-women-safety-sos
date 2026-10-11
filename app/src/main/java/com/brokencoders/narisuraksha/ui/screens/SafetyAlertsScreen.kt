@@ -74,7 +74,10 @@ fun SafetyAlertsScreen(
     viewModel: MainViewModel,
     onBack: () -> Unit,
     onNavigateToContacts: () -> Unit,
-    onNavigateToAlert: (senderId: Short, lat: Float, lon: Float, rssi: Int) -> Unit
+    onNavigateToAlert: (senderId: Short, lat: Float, lon: Float, rssi: Int) -> Unit,
+    onNavigateToHome: () -> Unit = onBack,
+    onNavigateToCommunity: () -> Unit = {},
+    onNavigateToProfile: () -> Unit = {}
 ) {
     val latestAlert by viewModel.latestReceivedAlert.collectAsState()
     val isScanEnabled by viewModel.isScanEnabled.collectAsState()
@@ -115,7 +118,11 @@ fun SafetyAlertsScreen(
             AppBottomBar(
                 currentRoute = "safety_alerts",
                 onNavigate = { route ->
-                    if (route == "home") onBack()
+                    when (route) {
+                        "home" -> onNavigateToHome()
+                        "community" -> onNavigateToCommunity()
+                        "profile", "settings" -> onNavigateToProfile()
+                    }
                 }
             )
         },

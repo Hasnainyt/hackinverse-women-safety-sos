@@ -87,7 +87,7 @@ export default function App() {
           </p>
 
           <a
-            href="https://github.com/Hasnainyt/hackinverse-women-safety"
+            href="https://github.com/Hasnainyt/hackinverse-women-safety-sos"
             target="_blank"
             rel="noreferrer"
             className="flex items-center gap-1.5 text-ink-primary hover:text-pink-primary font-bold"
