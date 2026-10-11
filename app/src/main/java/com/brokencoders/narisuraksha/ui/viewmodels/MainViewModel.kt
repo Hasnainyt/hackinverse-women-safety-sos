@@ -18,6 +18,7 @@ import com.brokencoders.narisuraksha.ble.BleScanner
 import com.brokencoders.narisuraksha.ble.BleTransport
 import com.brokencoders.narisuraksha.ble.ReceivedSos
 import com.brokencoders.narisuraksha.capture.Coordinates
+import com.brokencoders.narisuraksha.capture.LocationFix
 import com.brokencoders.narisuraksha.capture.LocationProvider
 import com.brokencoders.narisuraksha.core.DeviceIdProvider
 import com.brokencoders.narisuraksha.core.PermissionHelper
@@ -30,6 +31,7 @@ import com.brokencoders.narisuraksha.service.SosForegroundService
 import com.brokencoders.narisuraksha.trigger.ShakeDetector
 import com.brokencoders.narisuraksha.trigger.SosEvent
 import com.brokencoders.narisuraksha.trigger.SosManager
+import com.brokencoders.narisuraksha.wifi.WifiMeshTransport
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -51,7 +53,8 @@ class MainViewModel(
     private val emergencyContactDao: EmergencyContactDao,
     private val locationProvider: LocationProvider,
     private val bleAdvertiser: BleAdvertiser,
-    private val bleScanner: BleScanner
+    private val bleScanner: BleScanner,
+    private val wifiMesh: WifiMeshTransport? = null
 ) : ViewModel() {
 
     val isCountingDown: StateFlow<Boolean> = sosManager.isCountingDown
@@ -75,8 +78,9 @@ class MainViewModel(
 
     val anonymousDeviceId: Short get() = deviceIdProvider.deviceId
 
-    // Location Telemetry
+    // Location Telemetry (continuous high-accuracy fixes with honest precision)
     val currentCoordinates: StateFlow<Coordinates?> = locationProvider.currentCoordinates
+    val latestFix: StateFlow<LocationFix?> = locationProvider.latestFix
 
     // Emergency Contacts from Room
     val emergencyContacts: StateFlow<List<EmergencyContactEntity>> = emergencyContactDao.getAllContacts()
@@ -203,6 +207,13 @@ class MainViewModel(
      * Proactively verifies that background guardian scan is running if user has enabled it.
      */
     fun ensureGuardianScanActive() {
+        // WiFi mesh listener is permission-free (normal WiFi perms) and idles
+        // when unjoined — start it directly alongside the BLE guardian.
+        try {
+            wifiMesh?.start()
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not start WiFi mesh listener: ${e.message}")
+        }
         if (isScanEnabled.value && PermissionHelper.hasBluetoothScanPermission(context)) {
             try {
                 ScanForegroundService.start(context)
@@ -213,6 +224,11 @@ class MainViewModel(
     }
 
     fun refreshLocation() {
+        try {
+            locationProvider.startTracking()
+        } catch (e: Exception) {
+            Log.w(TAG, "Location tracking start failed: ${e.message}")
+        }
         viewModelScope.launch {
             locationProvider.getCurrentLocation()
         }
@@ -304,7 +320,8 @@ class MainViewModel(
         if (_isTestBroadcasting.value) return
         _isTestBroadcasting.value = true
 
-        val coords = currentCoordinates.value
+        val fix = latestFix.value
+        val coords = fix?.toCoordinates() ?: currentCoordinates.value
         val testPacket = SosPacket.create(
             senderId = deviceIdProvider.deviceId,
             lat = coords?.lat,
@@ -464,11 +481,20 @@ class MainViewModel(
                 Toast.makeText(context, "Invalid phone number", Toast.LENGTH_SHORT).show()
                 return
             }
+            val fix = latestFix.value
             val coords = currentCoordinates.value
             val locationString = when {
                 customLocationText != null -> customLocationText
-                coords != null -> "Lat: ${coords.lat}, Lon: ${coords.lon} (Accuracy: ±${coords.accuracy?.toInt() ?: 15}m)"
-                else -> "Location unavailable (Offline)"
+                fix != null -> {
+                    val accText = fix.accuracyM?.let { "±${it.toInt()} m" } ?: "accuracy unknown"
+                    val ageS = fix.ageMs() / 1000
+                    "Lat: ${fix.lat}, Lon: ${fix.lon} ($accText, ${ageS}s old)\n${fix.mapsLink()}"
+                }
+                coords != null -> {
+                    val accText = coords.accuracy?.let { "±${it.toInt()} m" } ?: "accuracy unknown"
+                    "Lat: ${coords.lat}, Lon: ${coords.lon} ($accText)\nhttps://maps.google.com/?q=${coords.lat},${coords.lon}"
+                }
+                else -> "Location unavailable (Offline — track via BLE mesh proximity)"
             }
             val time = SimpleDateFormat("HH:mm:ss dd/MM/yyyy", Locale.getDefault()).format(Date())
 
@@ -530,6 +556,10 @@ class MainViewModel(
             preferencesRepository.setGuardianScanEnabled(enabled)
             if (!enabled) {
                 ScanForegroundService.stop(context)
+                try {
+                    wifiMesh?.stop()
+                } catch (_: Exception) {
+                }
                 return@launch
             }
             if (PermissionHelper.hasBluetoothPermissions(context)) {
@@ -649,6 +679,11 @@ class MainViewModel(
         } catch (_: Exception) {
             // ignore sensor teardown failures
         }
+        try {
+            locationProvider.stopTracking()
+        } catch (_: Exception) {
+            // ignore tracking teardown failures
+        }
     }
 
     companion object {
@@ -670,7 +705,8 @@ class MainViewModel(
             emergencyContactDao: EmergencyContactDao,
             locationProvider: LocationProvider,
             bleAdvertiser: BleAdvertiser,
-            bleScanner: BleScanner
+            bleScanner: BleScanner,
+            wifiMesh: WifiMeshTransport? = null
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -684,7 +720,8 @@ class MainViewModel(
                     emergencyContactDao,
                     locationProvider,
                     bleAdvertiser,
-                    bleScanner
+                    bleScanner,
+                    wifiMesh
                 ) as T
             }
         }

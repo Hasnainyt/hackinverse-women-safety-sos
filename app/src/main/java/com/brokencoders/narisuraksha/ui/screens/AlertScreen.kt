@@ -414,6 +414,12 @@ fun AlertScreen(
                             ),
                             color = TextPrimary
                         )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Sender accuracy unknown — BLE beacons carry coordinates only; use proximity + bearing.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
 
                         Spacer(modifier = Modifier.height(16.dp))
 

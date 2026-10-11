@@ -49,7 +49,8 @@ class MainActivity : ComponentActivity() {
             emergencyContactDao = app.emergencyContactDao,
             locationProvider = app.locationProvider,
             bleAdvertiser = app.bleAdvertiser,
-            bleScanner = app.bleScanner
+            bleScanner = app.bleScanner,
+            wifiMesh = app.wifiMesh
         )
     }
 

@@ -88,6 +88,12 @@ class SosForegroundService : Service() {
         )
 
         Log.i(TAG, "Starting BLE broadcast for packet: $packet")
+        // Primary medium first: WiFi UDP flood reaches ~50-100m per hop.
+        try {
+            app.wifiMesh.broadcast(packet)
+        } catch (e: Exception) {
+            Log.w(TAG, "WiFi SOS broadcast failed (BLE continues): ${e.message}")
+        }
         try {
             bleTransport.startAdvertising(packet)
         } catch (e: SecurityException) {
@@ -117,11 +123,63 @@ class SosForegroundService : Service() {
             )
             sosDao.insertEvent(entity)
 
+            // Live location refresh: while the alert is active, re-broadcast
+            // with fresher coordinates when the victim moves (≥25 m) or every
+            // 60 s, so responders converge on the current position.
+            var lastLat = lat
+            var lastLon = lon
+            var lastRefresh = System.currentTimeMillis()
+            val deadline = lastRefresh + Constants.SOS_ADVERTISE_TIMEOUT_MS
+            try {
+                // Bounded by the broadcast window: collection ends at the
+                // deadline and the service stops itself below.
+                kotlinx.coroutines.withTimeoutOrNull((deadline - System.currentTimeMillis()).coerceAtLeast(0L)) {
+                    app.locationProvider.latestFix.collect { fix ->
+                        if (fix == null) return@collect
+                        val now = System.currentTimeMillis()
+                    val prevLat = lastLat
+                    val prevLon = lastLon
+                    val moved = (prevLat == null || prevLon == null) ||
+                        haversineM(prevLat, prevLon, fix.lat, fix.lon) >= LIVE_UPDATE_MIN_DISPLACEMENT_M
+                    val due = now - lastRefresh >= LIVE_UPDATE_MAX_AGE_MS
+                    if ((moved || due) && fix.quality(now) != com.brokencoders.narisuraksha.capture.FixQuality.STALE) {
+                        lastLat = fix.lat
+                        lastLon = fix.lon
+                        lastRefresh = now
+                        try {
+                            val fresh = SosPacket.create(
+                                senderId = deviceId,
+                                lat = fix.lat,
+                                lon = fix.lon
+                            )
+                            Log.i(TAG, "Live update: re-broadcasting SOS at ${fix.describe(now)}")
+                            bleTransport.stopAdvertising()
+                            bleTransport.startAdvertising(fresh)
+                            app.wifiMesh.broadcast(fresh)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Live location re-broadcast failed: ${e.message}")
+                        }
+                    }
+                }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Live location collector ended: ${e.message}")
+            }
+
             // Auto-stop service after timeout
-            delay(Constants.SOS_ADVERTISE_TIMEOUT_MS)
             Log.i(TAG, "Broadcasting timeout complete. Stopping SosForegroundService.")
             stopSelf()
         }
+    }
+
+    private fun haversineM(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val r = 6371000.0
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLon = Math.toRadians(lon2 - lon1)
+        val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2)
+        return 2 * r * Math.asin(Math.sqrt(a))
     }
 
     override fun onDestroy() {
@@ -145,6 +203,10 @@ class SosForegroundService : Service() {
 
     companion object {
         private const val TAG = "SosForegroundService"
+        /** Re-broadcast live position after this displacement. */
+        private const val LIVE_UPDATE_MIN_DISPLACEMENT_M = 25.0
+        /** Re-broadcast live position at least this often. */
+        private const val LIVE_UPDATE_MAX_AGE_MS = 60_000L
         const val ACTION_START_SOS = "com.brokencoders.narisuraksha.START_SOS"
         const val ACTION_STOP_SOS = "com.brokencoders.narisuraksha.STOP_SOS"
         const val EXTRA_LAT = "extra_lat"

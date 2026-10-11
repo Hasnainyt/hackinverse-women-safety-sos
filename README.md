@@ -44,6 +44,7 @@ Using autonomous multi-hop **Bluetooth Low Energy (BLE) mesh flooding**, an emer
   - **Deduplication**: `RelayDedupCache` (256 entries, 60 s expiry) drops already-seen packets so loops and re-floods never multiply.
   - **Battery-safe budgets**: max 12 relays/minute per device + 12/minute mesh budget, with 200–1500 ms randomized jitter to avoid air collisions.
   - **Priority queue**: own SOS (rank 1) preempts own ACK (rank 2) and relay traffic (rank 3); the single hardware advertiser slot is never stolen by a relay.
+- 📶 **WiFi-First, Bluetooth-Always Dual Mesh**: WiFi is the **primary** medium — when joined to any LAN (home router, venue WiFi, phone hotspot; no internet needed), SOS floods as UDP broadcasts (port `47235`, same 17-byte packet encoding) at ~50–100 m per hop. Bluetooth LE is the **always-on fallback** (~10–30 m/hop) that carries everything when WiFi is off or unjoined. Both media feed **one shared `MeshCore`** (single dedup cache, TTL policy, budgets), so a broadcast heard on both is one event — never a storm — and every relay fans out on **both** media. WiFi needs only normal install-time permissions (`INTERNET`, `ACCESS_WIFI_STATE`): no extra runtime prompt.
 
 - ⚡ **Multi-Trigger SOS with 3-Second Confirmation**:
   - **1-Tap Pulsating Hero SOS Button** with tactile ring feedback.
@@ -156,6 +157,20 @@ No pairing. No internet. Every phone running the app is a relay node:
 
 ---
 
+### 📶 WiFi Mesh Wire Format (UDP Broadcast)
+
+```
+[ WiFi UDP datagram -> port 47235 ] (21 Bytes)
+  ├── Offset 0:     Envelope Magic: 0x57 ('W') (1 byte)
+  ├── Offset 1:     Envelope Version: 0x01 (1 byte)
+  ├── Offset 2..3:  Payload Length: UShort (2 bytes, Big-Endian)
+  └── Offset 4..20: SOS Wire Payload: 17 Bytes (identical to the BLE packet above, TTL included)
+```
+
+LAN noise that fails magic/version/length checks is dropped before decode, so busy networks can never inject phantom SOS alerts.
+
+---
+
 ## 📳 Shake Detection Engine Specification
 
 The shake detector uses a dedicated, testable algorithm engine (`ShakeDetectionEngine`):
@@ -166,6 +181,17 @@ The shake detector uses a dedicated, testable algorithm engine (`ShakeDetectionE
   - *Why this is critical*: When a phone drops or is placed on a table, the accelerometer produces rapid oscillation samples within 10–50ms. Debouncing with a 220ms minimum interval guarantees that each spike corresponds to a human shaking stroke, eliminating false positives from normal handling, table placement, walking, or screen rotation.
 - **Post-Trigger Cooldown**: `3000 ms` (3 seconds) between alerts.
 - **Diagnostics**: Real-time G-force, peak G-force, spike count, last spike timestamp, and cooldown status viewable live in the Diagnostics screen.
+
+---
+
+## 📍 Precise Real-Time Location Tracking
+
+- **Continuous GNSS tracking**: `PRIORITY_HIGH_ACCURACY` updates (5 s interval / 2 s fastest / 5 m displacement) keep a fresh `LocationFix` at all times, so SOS sends the latest position with zero acquisition delay.
+- **Honest precision model**: every fix carries `accuracyM` (±m radius), `timestamp`, and `provider`. Quality tiers — `HIGH` (≤15 m, ≤15 s), `MEDIUM` (≤50 m, ≤60 s), `LOW`, `STALE` (>120 s) — drive UI badges. Coordinates are never shown without their accuracy; unknown precision renders as "Unknown", never a fabricated number.
+- **Fallback chain** (each stage time-boxed, never blocks SOS): fresh tracked fix → indoor ranging (future RTT/UWB hook) → high-accuracy GNSS one-shot → balanced/network one-shot → last-known → `null` (`FLAG_LOCATION_UNAVAILABLE`).
+- **SOS integration**: on activation, the latest fix + accuracy + age + Google Maps link (`https://maps.google.com/?q=lat,lon`) go to emergency contacts via SMS; while the alert broadcasts, the victim's beacon **re-broadcasts live** on movement (≥25 m) or every 60 s so responders converge on the current position.
+- **Graceful failures**: permission checks before every request, location-disabled detection, per-stage timeouts, `SecurityException` guards for mid-flight revocation.
+- **Future-proof**: `RangingProvider` interface (WiFi-RTT 802.11mc / UWB core-uwb) slots in with zero changes to SOS, SMS, or UI code. The web hub demos the same model via the Geolocation API (`LiveLocationCard`: high-accuracy `watchPosition` + accuracy/age display).
 
 ---
 
@@ -193,7 +219,7 @@ The generated APK will be output at:
 
 ## 🧪 Automated Test Suite
 
-Nari-Suraksha includes a battle-tested unit test suite covering **73 automated unit tests** across 12 test classes (100% pass rate):
+Nari-Suraksha includes a battle-tested unit test suite covering **89 automated unit tests** across 15 test classes (100% pass rate):
 
 | Test Class | Test Case | Description |
 |---|---|---|
@@ -241,6 +267,15 @@ Nari-Suraksha includes a battle-tested unit test suite covering **73 automated u
 | `SafeZonesRepositoryTest` | `testCompassBearingCalculation` | 360-degree compass bearing calculation accuracy |
 | `EmergencyContactEntityTest` | `testDefaultValues` | Room entity instantiation with default values |
 | `EmergencyContactEntityTest` | `testPrimaryFlagMutation` | Immutable primary flag updating |
+| `MeshCoreTest` | `testCrossTransportDuplicateDropped` | BLE+WiFi same broadcast counts once |
+| `MeshCoreTest` | `testSosAlertsAndRelaysWithDecrementedTtl` | Shared pipeline alert + TTL-1 relay |
+| `MeshCoreTest` | `testTtlExhaustedAlertsButNeverRelays` | TTL 0 delivered locally, never forwarded |
+| `MeshCoreTest` | `testForeignAckRelayedWithoutAlert` | Foreign ACKs forward silently toward victim |
+| `WifiEnvelopeTest` | `testWrapUnwrapRoundTripPreservesTtl` | UDP envelope preserves packet + TTL |
+| `WifiEnvelopeTest` | `testGarbageRejected` | LAN noise never decodes into phantom SOS |
+| `LocationFixTest` | `testHighQualityFreshAccurateFix` | HIGH tier for fresh ≤15 m fixes |
+| `LocationFixTest` | `testStaleFixFlaggedRegardlessOfAccuracy` | Old fixes flagged STALE, never trusted |
+| `LocationFixTest` | `testUnknownAccuracyNeverClaimsHigh` | Unknown precision never claims HIGH |
 
 ---
 

@@ -5,6 +5,7 @@ import FeatureGrid from './components/FeatureGrid'
 import InteractiveSimulator from './components/InteractiveSimulator'
 import OfflineArchitecture from './components/OfflineArchitecture'
 import SafeZonesExplorer from './components/SafeZonesExplorer'
+import LiveLocationCard from './components/LiveLocationCard'
 import DownloadSection from './components/DownloadSection'
 import BottomBar from './components/BottomBar'
 import { Shield, Heart, Github, ExternalLink } from 'lucide-react'
@@ -56,6 +57,11 @@ export default function App() {
         {/* Pre-Cached Safe Zones & Help Desks */}
         <div id="safezones">
           <SafeZonesExplorer />
+        </div>
+
+        {/* Live GNSS tracking demo (Geolocation API, high-accuracy) */}
+        <div id="live-location">
+          <LiveLocationCard />
         </div>
 
         {/* Download APK Section */}
