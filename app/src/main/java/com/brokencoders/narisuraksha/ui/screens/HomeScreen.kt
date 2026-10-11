@@ -193,7 +193,7 @@ fun HomeScreen(
     val lastUpdatedText = remember(currentCoords) {
         currentCoords?.timestamp?.let {
             SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date(it))
-        } ?: "Today, 10:24 AM"
+        } ?: "Not yet updated"
     }
 
     // Launch SOS Countdown (blocked until Bluetooth + Location are strictly on)

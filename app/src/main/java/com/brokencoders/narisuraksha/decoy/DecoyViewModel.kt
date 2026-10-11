@@ -57,7 +57,12 @@ class DecoyViewModel(
         viewModelScope.launch {
             val secretCode = preferencesRepository.secretDecoyCode.first()
 
-            if (currentInput == secretCode) {
+            // BUGFIX: Do not trigger SOS if the secret code is blank or too short.
+            // This prevents a race condition where DataStore hasn't loaded the persisted
+            // code yet, causing any calculator input to accidentally match an empty string.
+            if (secretCode.length < 4) {
+                Log.w(TAG, "Secret code not yet loaded or invalid — SOS trigger skipped.")
+            } else if (currentInput == secretCode) {
                 Log.w(TAG, "Secret SOS passcode entered in Decoy Calculator! Silently initiating SOS trigger...")
                 sosManager.triggerSos()
                 _decoySosTriggeredEvent.tryEmit(Unit)
