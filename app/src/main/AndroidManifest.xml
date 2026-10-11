@@ -42,6 +42,8 @@
 
     <!-- Notifications (Android 13+ / API 33+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Full-screen SOS alert intent (Android 14+ / API 34+ enforcement) -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
     <!-- Foreground Services -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -84,7 +86,7 @@
         <service
             android:name=".service.ScanForegroundService"
             android:exported="false"
-            android:foregroundServiceType="connectedDevice" />
+            android:foregroundServiceType="connectedDevice|location" />
 
         <!-- Foreground Service for Active SOS Broadcasting & Audio Recording -->
         <service

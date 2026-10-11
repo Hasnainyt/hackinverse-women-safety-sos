@@ -29,10 +29,16 @@ class ScanForegroundService : Service() {
 
         val notificationHelper = (application as NariSurakshaApp).notificationHelper
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            var fgsType = ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+            // BLE scan results are location-derived: include location type when granted
+            // to satisfy API 34+ FGS type enforcement.
+            if (com.brokencoders.narisuraksha.core.PermissionHelper.hasLocationPermission(this)) {
+                fgsType = fgsType or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+            }
             startForeground(
                 Constants.NOTIFICATION_ID_SERVICE,
                 notificationHelper.buildScanServiceNotification(),
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+                fgsType
             )
         } else {
             startForeground(Constants.NOTIFICATION_ID_SERVICE, notificationHelper.buildScanServiceNotification())
@@ -59,7 +65,19 @@ class ScanForegroundService : Service() {
         val sosDao = app.database.sosDao()
         val notificationHelper = app.notificationHelper
 
-        bleTransport.startScanning()
+        if (!com.brokencoders.narisuraksha.core.PermissionHelper.hasBluetoothPermissions(this)) {
+            Log.w(TAG, "Guardian scan aborted: Bluetooth permissions missing")
+            stopSelf()
+            return
+        }
+
+        try {
+            bleTransport.startScanning()
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Guardian scan aborted: missing BLE permission", e)
+            stopSelf()
+            return
+        }
 
         serviceScope.launch {
             bleTransport.received.collectLatest { receivedSos ->
@@ -106,6 +124,11 @@ class ScanForegroundService : Service() {
             if (it.isHeld) it.release()
         }
         serviceScope.cancel()
+        try {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } catch (_: Exception) {
+            // Pre-O fallback handled by stopSelf below
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -131,10 +154,11 @@ class ScanForegroundService : Service() {
         }
 
         fun stop(context: Context) {
-            val intent = Intent(context, ScanForegroundService::class.java).apply {
-                action = ACTION_STOP_SCAN
+            try {
+                context.stopService(Intent(context, ScanForegroundService::class.java))
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to stop ScanForegroundService: ${e.message}", e)
             }
-            context.startService(intent)
         }
     }
 }

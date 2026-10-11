@@ -53,11 +53,14 @@ fun NariSurakshaNavGraph(
                 onUnlockApp = {
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Decoy.route) { inclusive = true }
+                        launchSingleTop = true
                     }
                 },
                 onSosTriggered = {
                     // Silently triggers SOS, optionally show home screen
-                    navController.navigate(Screen.Home.route)
+                    navController.navigate(Screen.Home.route) {
+                        launchSingleTop = true
+                    }
                 }
             )
         }
@@ -65,14 +68,16 @@ fun NariSurakshaNavGraph(
         composable(Screen.Home.route) {
             HomeScreen(
                 viewModel = mainViewModel,
-                onNavigateToHistory = { navController.navigate(Screen.History.route) },
-                onNavigateToSafeZones = { navController.navigate(Screen.SafeZones.route) },
-                onNavigateToDecoy = { navController.navigate(Screen.Decoy.route) },
-                onNavigateToMap = { navController.navigate(Screen.Map.route) },
-                onNavigateToContacts = { navController.navigate(Screen.EmergencyContacts.route) },
-                onNavigateToBleDebug = { navController.navigate(Screen.BleDebug.route) },
+                onNavigateToHistory = { navController.navigate(Screen.History.route) { launchSingleTop = true } },
+                onNavigateToSafeZones = { navController.navigate(Screen.SafeZones.route) { launchSingleTop = true } },
+                onNavigateToDecoy = { navController.navigate(Screen.Decoy.route) { launchSingleTop = true } },
+                onNavigateToMap = { navController.navigate(Screen.Map.route) { launchSingleTop = true } },
+                onNavigateToContacts = { navController.navigate(Screen.EmergencyContacts.route) { launchSingleTop = true } },
+                onNavigateToBleDebug = { navController.navigate(Screen.BleDebug.route) { launchSingleTop = true } },
                 onNavigateToAlert = { senderId, lat, lon, rssi ->
-                    navController.navigate(Screen.Alert.createRoute(senderId, lat, lon, rssi))
+                    navController.navigate(Screen.Alert.createRoute(senderId, lat, lon, rssi)) {
+                        launchSingleTop = true
+                    }
                 }
             )
         }

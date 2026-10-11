@@ -94,6 +94,11 @@ class MainViewModel(
     private val _latestReceivedAlert = MutableStateFlow<ReceivedSos?>(null)
     val latestReceivedAlert: StateFlow<ReceivedSos?> = _latestReceivedAlert.asStateFlow()
 
+    /** Consumes the sticky incoming-alert banner after navigation to Alert. */
+    fun clearReceivedAlert() {
+        _latestReceivedAlert.value = null
+    }
+
     private val _responderAckCount = MutableStateFlow(0)
     val responderAckCount: StateFlow<Int> = _responderAckCount.asStateFlow()
     // Tracks unique responder IDs who have acknowledged this device's current SOS beacon
@@ -259,7 +264,11 @@ class MainViewModel(
         recentAckTargets[targetSenderId] = now
 
         // Opportunistic pruning so the map doesn't grow unbounded
-        recentAckTargets.entries.removeAll { now - it.value > ACK_COOLDOWN_MS * 4 }
+        try {
+            recentAckTargets.entries.removeAll { now - it.value > ACK_COOLDOWN_MS * 4 }
+        } catch (_: Exception) {
+            // ignore concurrent pruning failures; map is best-effort dedup
+        }
 
         Log.i(TAG, "Sending responder ACK beacon targeting sender #$targetSenderId")
 
@@ -271,7 +280,15 @@ class MainViewModel(
             targetSenderId = targetSenderId
         )
 
-        bleAdvertiser.startAdvertising(ackPacket, timeoutMs = ACK_ADVERTISE_TIMEOUT_MS)
+        try {
+            bleAdvertiser.startAdvertising(ackPacket, timeoutMs = ACK_ADVERTISE_TIMEOUT_MS)
+        } catch (e: SecurityException) {
+            Log.e(TAG, "ACK not sent: missing BLUETOOTH_ADVERTISE permission", e)
+            return
+        } catch (e: IllegalStateException) {
+            Log.e(TAG, "ACK not sent: Bluetooth off", e)
+            return
+        }
 
         BleDiagnosticsTracker.recordEvent(
             "NARI_BLE_ACK_SENT",
@@ -299,7 +316,17 @@ class MainViewModel(
             "NARI_BLE_ADVERTISE_START",
             "Broadcasting 10-second TEST beacon (FLAG_TEST set)"
         )
-        bleAdvertiser.startAdvertising(testPacket, timeoutMs = 10_000L)
+        try {
+            bleAdvertiser.startAdvertising(testPacket, timeoutMs = 10_000L)
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Test broadcast blocked: missing BLUETOOTH_ADVERTISE permission", e)
+            _isTestBroadcasting.value = false
+            return
+        } catch (e: IllegalStateException) {
+            Log.e(TAG, "Test broadcast blocked: Bluetooth off", e)
+            _isTestBroadcasting.value = false
+            return
+        }
 
         viewModelScope.launch {
             kotlinx.coroutines.delay(10_000L)
@@ -313,7 +340,13 @@ class MainViewModel(
     }
 
     fun restartBleScan() {
-        bleScanner.restartScanning()
+        try {
+            bleScanner.restartScanning()
+        } catch (e: SecurityException) {
+            Log.e(TAG, "BLE rescan blocked: missing permissions", e)
+        } catch (e: IllegalStateException) {
+            Log.e(TAG, "BLE rescan blocked: Bluetooth off", e)
+        }
     }
 
     fun toggleDebugScanMode(enabled: Boolean) {
@@ -404,10 +437,18 @@ class MainViewModel(
     fun callContact(phoneNumber: String) {
         try {
             val cleanPhone = phoneNumber.filter { it.isDigit() || it == '+' }
+            if (cleanPhone.isEmpty()) {
+                Toast.makeText(context, "Invalid phone number", Toast.LENGTH_SHORT).show()
+                return
+            }
             val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$cleanPhone")).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
-            context.startActivity(intent)
+            if (intent.resolveActivity(context.packageManager) != null) {
+                context.startActivity(intent)
+            } else {
+                Toast.makeText(context, "No dialer app found", Toast.LENGTH_SHORT).show()
+            }
         } catch (e: Exception) {
             Toast.makeText(context, "Could not open dialer: ${e.message}", Toast.LENGTH_SHORT).show()
         }
@@ -419,6 +460,10 @@ class MainViewModel(
     fun sendEmergencySms(phoneNumber: String, customLocationText: String? = null) {
         try {
             val cleanPhone = phoneNumber.filter { it.isDigit() || it == '+' }
+            if (cleanPhone.isEmpty()) {
+                Toast.makeText(context, "Invalid phone number", Toast.LENGTH_SHORT).show()
+                return
+            }
             val coords = currentCoordinates.value
             val locationString = when {
                 customLocationText != null -> customLocationText
@@ -446,7 +491,11 @@ class MainViewModel(
                 putExtra("sms_body", message)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
-            context.startActivity(intent)
+            if (intent.resolveActivity(context.packageManager) != null) {
+                context.startActivity(intent)
+            } else {
+                Toast.makeText(context, "No SMS app found", Toast.LENGTH_SHORT).show()
+            }
         } catch (e: Exception) {
             Toast.makeText(context, "Could not open SMS app: ${e.message}", Toast.LENGTH_SHORT).show()
         }
@@ -499,11 +548,41 @@ class MainViewModel(
 
     fun toggleFlashlight() {
         try {
+            // CAMERA runtime permission is required for setTorchMode on API 23+.
+            if (androidx.core.content.ContextCompat.checkSelfPermission(
+                    context, android.Manifest.permission.CAMERA
+                ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+            ) {
+                Log.w(TAG, "Flashlight unavailable: CAMERA permission not granted")
+                return
+            }
             val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as? CameraManager
-            val cameraId = cameraManager?.cameraIdList?.firstOrNull() ?: return
+                ?: return
+            // Select a back-facing camera with an actual flash unit — firstOrNull()
+            // commonly returns the front camera without flash and throws.
+            var flashCameraId: String? = null
+            for (id in cameraManager.cameraIdList) {
+                try {
+                    val chars = cameraManager.getCameraCharacteristics(id)
+                    val hasFlash = chars.get(android.hardware.camera2.CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
+                    val facing = chars.get(android.hardware.camera2.CameraCharacteristics.LENS_FACING)
+                    if (hasFlash && facing == android.hardware.camera2.CameraCharacteristics.LENS_FACING_BACK) {
+                        flashCameraId = id
+                        break
+                    }
+                    if (hasFlash && flashCameraId == null) {
+                        flashCameraId = id
+                    }
+                } catch (_: Exception) {
+                    continue
+                }
+            }
+            val cameraId = flashCameraId ?: return
             val newState = !_isFlashlightOn.value
             cameraManager.setTorchMode(cameraId, newState)
             _isFlashlightOn.value = newState
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Flashlight denied: missing CAMERA permission", e)
         } catch (e: Exception) {
             Log.e(TAG, "Error toggling flashlight", e)
         }
@@ -513,8 +592,14 @@ class MainViewModel(
         try {
             val newState = !_isSirenOn.value
             if (newState) {
+                alarmRingtone?.stop()
+                alarmRingtone = null
                 val alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
                     ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+                if (alarmUri == null) {
+                    Log.w(TAG, "Siren unavailable: no alarm/ringtone URI on this device")
+                    return
+                }
                 alarmRingtone = RingtoneManager.getRingtone(context, alarmUri)?.apply {
                     audioAttributes = AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_ALARM)
@@ -535,7 +620,35 @@ class MainViewModel(
 
     override fun onCleared() {
         super.onCleared()
-        alarmRingtone?.stop()
+        try {
+            alarmRingtone?.stop()
+        } catch (_: Exception) {
+            // ignore stop failures during teardown
+        } finally {
+            alarmRingtone = null
+        }
+        try {
+            val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as? CameraManager
+            if (_isFlashlightOn.value && cameraManager != null) {
+                for (id in cameraManager.cameraIdList) {
+                    try {
+                        cameraManager.setTorchMode(id, false)
+                        break
+                    } catch (_: Exception) {
+                        continue
+                    }
+                }
+            }
+        } catch (_: Exception) {
+            // ignore torch teardown failures
+        } finally {
+            _isFlashlightOn.value = false
+        }
+        try {
+            shakeDetector.stop()
+        } catch (_: Exception) {
+            // ignore sensor teardown failures
+        }
     }
 
     companion object {

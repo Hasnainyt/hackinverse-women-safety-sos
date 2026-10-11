@@ -48,6 +48,7 @@ class BleScanner(
     )
     val received: Flow<ReceivedSos> = _received.asSharedFlow()
 
+    @Volatile
     var isScanning = false
         private set
 
@@ -70,12 +71,18 @@ class BleScanner(
     private val scanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult?) {
             super.onScanResult(callbackType, result)
-            processScanResult(result)
+            if (result == null) return
+            externalScope.launch(Dispatchers.Default) {
+                processScanResult(result)
+            }
         }
 
         override fun onBatchScanResults(results: MutableList<ScanResult>?) {
             super.onBatchScanResults(results)
-            results?.forEach { processScanResult(it) }
+            if (results.isNullOrEmpty()) return
+            externalScope.launch(Dispatchers.Default) {
+                results.forEach { processScanResult(it) }
+            }
         }
 
         override fun onScanFailed(errorCode: Int) {
@@ -121,6 +128,7 @@ class BleScanner(
         // 4. Scan all available service data entries if UUID variation occurred
         if (payloadBytes == null && scanRecord.serviceData != null) {
             for ((uuid, data) in scanRecord.serviceData) {
+                if (data == null) continue
                 if (uuid.uuid.toString().contains("fde1", ignoreCase = true) ||
                     data.size >= PacketCodec.LEGACY_PACKET_SIZE_BYTES
                 ) {
@@ -140,9 +148,18 @@ class BleScanner(
         val packet = PacketCodec.decode(payloadBytes)
         if (packet == null) {
             BleDiagnosticsTracker.incrementRejectedPackets()
+            val deviceAddress = try {
+                if (PermissionHelper.hasBluetoothConnectPermission(context)) {
+                    result.device?.address ?: "unknown"
+                } else {
+                    "unknown"
+                }
+            } catch (_: SecurityException) {
+                "unknown"
+            }
             BleDiagnosticsTracker.recordEvent(
                 "NARI_BLE_PACKET_REJECTED",
-                "Failed to decode packet of length ${payloadBytes.size} bytes from ${result.device.address}"
+                "Failed to decode packet of length ${payloadBytes.size} bytes from $deviceAddress"
             )
             return
         }
@@ -395,14 +412,16 @@ class BleScanner(
 
     @SuppressLint("MissingPermission")
     private fun startScanWithFilters() {
-        // Safe filters: only Service UUIDs (never empty manufacturer data)
+        // Safe filters: only Service UUIDs (never empty manufacturer data).
+        // Deduplicated: SOS_SERVICE_UUID and SOS_LEGACY_128_UUID currently map to
+        // the same 0xFDE1 value, so registering both would waste a scarce HW slot.
         val filters = listOf(
             ScanFilter.Builder().setServiceUuid(Constants.SOS_PARCEL_UUID).build(),
             ScanFilter.Builder().setServiceUuid(ParcelUuid(Constants.SOS_LEGACY_128_UUID)).build()
-        )
+        ).distinctBy { it.serviceUuid }
 
         val settingsBuilder = ScanSettings.Builder()
-            .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+            .setScanMode(ScanSettings.SCAN_MODE_BALANCED)
             .setReportDelay(0)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -418,6 +437,7 @@ class BleScanner(
             Log.i(TAG, "BLE Scanner started with multi-payload filters")
         } catch (e: Exception) {
             BleDiagnosticsTracker.recordEvent("NARI_BLE_SCAN_FAILURE", "Hardware filter start failed: ${e.message}. Falling back...", isError = true)
+            fallbackScanAttempted = true
             startScanWithoutFilters()
         }
     }
@@ -425,7 +445,7 @@ class BleScanner(
     @SuppressLint("MissingPermission")
     private fun startScanWithoutFilters() {
         val settingsBuilder = ScanSettings.Builder()
-            .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+            .setScanMode(ScanSettings.SCAN_MODE_BALANCED)
             .setReportDelay(0)
 
         try {

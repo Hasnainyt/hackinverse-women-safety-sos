@@ -36,6 +36,8 @@ import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.FlashlightOff
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -46,6 +48,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -57,12 +60,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.brokencoders.narisuraksha.R
+import com.brokencoders.narisuraksha.core.PermissionHelper
 import com.brokencoders.narisuraksha.data.EmergencyContactEntity
 import com.brokencoders.narisuraksha.ui.components.AppBottomBar
 import com.brokencoders.narisuraksha.ui.components.CountdownOverlay
@@ -105,8 +113,51 @@ fun HomeScreen(
     onNavigateToBleDebug: () -> Unit,
     onNavigateToAlert: (senderId: Short, lat: Float, lon: Float, rssi: Int) -> Unit
 ) {
+    val context = LocalContext.current
+
+    var hasPermissions by remember {
+        mutableStateOf(PermissionHelper.hasAllPermissions(context))
+    }
+    var hasBluetoothPerm by remember {
+        mutableStateOf(PermissionHelper.hasBluetoothPermissions(context))
+    }
+    var hasLocationPerm by remember {
+        mutableStateOf(PermissionHelper.hasLocationPermission(context))
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        hasPermissions = PermissionHelper.hasAllPermissions(context)
+        hasBluetoothPerm = PermissionHelper.hasBluetoothPermissions(context)
+        hasLocationPerm = PermissionHelper.hasLocationPermission(context)
+        if (hasBluetoothPerm) {
+            viewModel.ensureGuardianScanActive()
+        }
+    }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                hasPermissions = PermissionHelper.hasAllPermissions(context)
+                hasBluetoothPerm = PermissionHelper.hasBluetoothPermissions(context)
+                hasLocationPerm = PermissionHelper.hasLocationPermission(context)
+                if (hasBluetoothPerm) {
+                    viewModel.ensureGuardianScanActive()
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     LaunchedEffect(Unit) {
-        viewModel.ensureGuardianScanActive()
+        if (hasBluetoothPerm) {
+            viewModel.ensureGuardianScanActive()
+        }
     }
 
     val isCountingDown by viewModel.isCountingDown.collectAsState()
@@ -158,6 +209,18 @@ fun HomeScreen(
                     onOpenSettings = { isSettingsOpen = true }
                 )
 
+                if (!hasPermissions) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    PermissionBanner(
+                        onRequestPermissions = {
+                            permissionLauncher.launch(PermissionHelper.getRequiredPermissions().toTypedArray())
+                        },
+                        onOpenSettings = {
+                            PermissionHelper.openAppSettings(context)
+                        }
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Incoming Distress Alert Banner (if peer detected)
@@ -170,6 +233,9 @@ fun HomeScreen(
                                 alert.packet.lon,
                                 alert.rssi
                             )
+                            // Consume the sticky alert so returning from Alert
+                            // doesn't re-show the banner and stack duplicates.
+                            viewModel.clearReceivedAlert()
                         }
                     )
                     Spacer(modifier = Modifier.height(16.dp))
@@ -194,13 +260,16 @@ fun HomeScreen(
                 } else {
                     // Standby Calm Home Experience
                     StandbyHomeView(
+                        hasBluetoothPerm = hasBluetoothPerm,
+                        hasLocationPerm = hasLocationPerm,
                         isScanEnabled = isScanEnabled,
                         responderAckCount = responderAckCount,
                         primaryContact = primaryContact,
                         onTriggerSos = { viewModel.triggerSos() },
                         onCallPrimaryContact = {
-                            if (primaryContact != null) {
-                                viewModel.callContact(primaryContact!!.phoneNumber)
+                            val contact = primaryContact
+                            if (contact != null) {
+                                viewModel.callContact(contact.phoneNumber)
                             } else {
                                 onNavigateToContacts()
                             }
@@ -390,6 +459,89 @@ private fun IncomingDistressBanner(
 }
 
 /**
+ * Prominent banner displayed when permissions required for offline mesh & SOS are missing.
+ */
+@Composable
+private fun PermissionBanner(
+    onRequestPermissions: () -> Unit,
+    onOpenSettings: () -> Unit
+) {
+    InfoCard(
+        backgroundColor = WarningAmber.copy(alpha = 0.12f),
+        borderColor = WarningAmber
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(WarningAmber.copy(alpha = 0.2f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = WarningAmber,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Permissions Required",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 17.sp
+                        ),
+                        color = TextPrimary
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Bluetooth and Location are required for offline SOS broadcasting and beacon scanning.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(14.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Button(
+                    onClick = onRequestPermissions,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = PrimaryPink,
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(44.dp)
+                ) {
+                    Text("Grant Permissions", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                }
+                Button(
+                    onClick = onOpenSettings,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = SoftPinkSurface,
+                        contentColor = PrimaryPink
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.height(44.dp)
+                ) {
+                    Text("App Settings", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                }
+            }
+        }
+    }
+}
+
+/**
  * Normal Standby View:
  * 1. Centered 220dp SOS button ("Hold for help", solid pink, white shield icon, slow pulse ring).
  * 2. StatusChips row: Bluetooth, Location, Mesh relay (On/Off).
@@ -398,6 +550,8 @@ private fun IncomingDistressBanner(
  */
 @Composable
 private fun StandbyHomeView(
+    hasBluetoothPerm: Boolean,
+    hasLocationPerm: Boolean,
     isScanEnabled: Boolean,
     responderAckCount: Int,
     primaryContact: EmergencyContactEntity?,
@@ -414,6 +568,11 @@ private fun StandbyHomeView(
     onToggleScan: (Boolean) -> Unit,
     onToggleDecoy: (Boolean) -> Unit
 ) {
+    val context = LocalContext.current
+    val isBtReady = hasBluetoothPerm && PermissionHelper.isBluetoothEnabled(context)
+    val isLocReady = hasLocationPerm && PermissionHelper.isLocationServiceEnabled(context)
+    val isMeshReady = isScanEnabled && isBtReady
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -435,19 +594,19 @@ private fun StandbyHomeView(
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
         ) {
             StatusChip(
-                label = stringResource(R.string.bluetooth_status),
+                label = if (isBtReady) stringResource(R.string.bluetooth_status) else "Bluetooth Off",
                 icon = Icons.Default.Bluetooth,
-                statusColor = SafeGreen
+                statusColor = if (isBtReady) SafeGreen else WarningAmber
             )
             StatusChip(
-                label = stringResource(R.string.location_status),
+                label = if (isLocReady) stringResource(R.string.location_status) else "Location Off",
                 icon = Icons.Default.LocationOn,
-                statusColor = SafeGreen
+                statusColor = if (isLocReady) SafeGreen else WarningAmber
             )
             StatusChip(
-                label = if (isScanEnabled) stringResource(R.string.mesh_relay_on) else stringResource(R.string.mesh_relay_off),
+                label = if (isMeshReady) stringResource(R.string.mesh_relay_on) else stringResource(R.string.mesh_relay_off),
                 icon = Icons.Default.Sensors,
-                statusColor = if (isScanEnabled) SafeGreen else WarningAmber
+                statusColor = if (isMeshReady) SafeGreen else WarningAmber
             )
         }
 

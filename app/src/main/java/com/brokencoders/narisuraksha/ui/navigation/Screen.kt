@@ -6,7 +6,12 @@ sealed class Screen(val route: String) {
     data object Home : Screen("home")
     data object Alert : Screen("alert?senderId={senderId}&lat={lat}&lon={lon}&rssi={rssi}") {
         fun createRoute(senderId: Short, lat: Float, lon: Float, rssi: Int): String {
-            return "alert?senderId=$senderId&lat=$lat&lon=$lon&rssi=$rssi"
+            // NavType.FloatType crashes on NaN/Infinity — sanitize at the single
+            // choke point so every caller is safe.
+            val safeLat = if (lat.isFinite()) lat else 0f
+            val safeLon = if (lon.isFinite()) lon else 0f
+            val safeSender = senderId.toInt()
+            return "alert?senderId=$safeSender&lat=$safeLat&lon=$safeLon&rssi=$rssi"
         }
     }
     data object History : Screen("history")
