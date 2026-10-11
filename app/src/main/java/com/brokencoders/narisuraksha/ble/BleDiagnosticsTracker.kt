@@ -45,6 +45,15 @@ object BleDiagnosticsTracker {
     private val _rejectedPacketsCount = MutableStateFlow(0)
     val rejectedPacketsCount: StateFlow<Int> = _rejectedPacketsCount.asStateFlow()
 
+    private val _relayedCount = MutableStateFlow(0)
+    val relayedCount: StateFlow<Int> = _relayedCount.asStateFlow()
+
+    private val _duplicatesDroppedCount = MutableStateFlow(0)
+    val duplicatesDroppedCount: StateFlow<Int> = _duplicatesDroppedCount.asStateFlow()
+
+    private val _lastReceivedTtl = MutableStateFlow<Int?>(null)
+    val lastReceivedTtl: StateFlow<Int?> = _lastReceivedTtl.asStateFlow()
+
     // Debug scan mode: When true, enables minimal/software filtering so hardware driver
     // limitations do not suppress incoming packets on heterogeneous OEM chipsets.
     private val _debugScanModeEnabled = MutableStateFlow(true)
@@ -102,6 +111,18 @@ object BleDiagnosticsTracker {
         _rejectedPacketsCount.value += 1
     }
 
+    fun incrementRelayed() {
+        _relayedCount.value += 1
+    }
+
+    fun incrementDuplicatesDropped() {
+        _duplicatesDroppedCount.value += 1
+    }
+
+    fun setLastReceivedTtl(ttl: Int) {
+        _lastReceivedTtl.value = ttl
+    }
+
     fun setDebugScanMode(enabled: Boolean) {
         _debugScanModeEnabled.value = enabled
         recordEvent("NARI_BLE_CONFIG", "Debug Scan Mode (software filtering) set to: $enabled")
@@ -114,5 +135,8 @@ object BleDiagnosticsTracker {
         _acksSentCount.value = 0
         _acksReceivedCount.value = 0
         _rejectedPacketsCount.value = 0
+        _relayedCount.value = 0
+        _duplicatesDroppedCount.value = 0
+        _lastReceivedTtl.value = null
     }
 }

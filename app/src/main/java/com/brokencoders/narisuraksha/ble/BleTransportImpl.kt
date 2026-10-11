@@ -11,10 +11,20 @@ class BleTransportImpl(
     private val scanner: BleScanner
 ) : BleTransport {
 
+    init {
+        scanner.relayHandler = { packet ->
+            advertiser.queueRelay(packet)
+        }
+    }
+
     override val received: Flow<ReceivedSos> = scanner.received
 
     override fun startAdvertising(packet: SosPacket) {
         advertiser.startAdvertising(packet)
+    }
+
+    override fun queueRelay(packet: SosPacket) {
+        advertiser.queueRelay(packet)
     }
 
     override fun stopAdvertising() {

@@ -22,9 +22,16 @@ class FakeBleTransport : BleTransport {
     var lastAdvertisedPacket: SosPacket? = null
         private set
 
+    var lastRelayedPacket: SosPacket? = null
+        private set
+
     override fun startAdvertising(packet: SosPacket) {
         isAdvertising = true
         lastAdvertisedPacket = packet
+    }
+
+    override fun queueRelay(packet: SosPacket) {
+        lastRelayedPacket = packet
     }
 
     override fun stopAdvertising() {

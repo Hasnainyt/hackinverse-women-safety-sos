@@ -45,6 +45,11 @@ class NariSurakshaApp : Application() {
         super.onCreate()
         Log.i("NariSurakshaApp", "Application initialized with Anonymous Device ID: ${deviceIdProvider.deviceId}")
 
+        // Explicitly wire BLE mesh relay forwarding so scanner delegates directly to advertiser
+        bleScanner.relayHandler = { packet ->
+            bleAdvertiser.queueRelay(packet)
+        }
+
         // Initialize Background Guardian Scanner if enabled
         applicationScope.launch {
             val isScanEnabled = preferencesRepository.isGuardianScanEnabled.first()
