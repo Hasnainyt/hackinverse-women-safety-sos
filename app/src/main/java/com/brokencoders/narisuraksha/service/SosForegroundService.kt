@@ -28,19 +28,35 @@ class SosForegroundService : Service() {
         val notificationHelper = (application as NariSurakshaApp).notificationHelper
         val notification = notificationHelper.buildSosBroadcastingNotification()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            var fgsType = ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
-            if (com.brokencoders.narisuraksha.core.PermissionHelper.hasLocationPermission(this)) {
-                fgsType = fgsType or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                if (com.brokencoders.narisuraksha.core.PermissionHelper.hasAudioPermission(this)) {
-                    fgsType = fgsType or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                var fgsType = 0
+                if (com.brokencoders.narisuraksha.core.PermissionHelper.hasBluetoothPermissions(this)) {
+                    fgsType = fgsType or ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
                 }
+                if (com.brokencoders.narisuraksha.core.PermissionHelper.hasLocationPermission(this)) {
+                    fgsType = fgsType or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    if (com.brokencoders.narisuraksha.core.PermissionHelper.hasAudioPermission(this)) {
+                        fgsType = fgsType or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                    }
+                }
+                if (fgsType != 0) {
+                    startForeground(Constants.NOTIFICATION_ID_SOS_ACTIVE, notification, fgsType)
+                } else {
+                    startForeground(Constants.NOTIFICATION_ID_SOS_ACTIVE, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
+                }
+            } else {
+                startForeground(Constants.NOTIFICATION_ID_SOS_ACTIVE, notification)
             }
-            startForeground(Constants.NOTIFICATION_ID_SOS_ACTIVE, notification, fgsType)
-        } else {
-            startForeground(Constants.NOTIFICATION_ID_SOS_ACTIVE, notification)
+        } catch (e: Exception) {
+            Log.e(TAG, "startForeground with types failed: ${e.message}", e)
+            try {
+                startForeground(Constants.NOTIFICATION_ID_SOS_ACTIVE, notification)
+            } catch (e2: Exception) {
+                Log.e(TAG, "Fallback startForeground failed: ${e2.message}", e2)
+            }
         }
     }
 
