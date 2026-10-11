@@ -185,7 +185,11 @@ fun SafetyAlertsScreen(
                                 color = DarkHeading
                             )
                             Text(
-                                text = "Signal strength ${alert.rssi} dBm. Tap to open distance tracker and response tools.",
+                                text = if (alert.transport == com.brokencoders.narisuraksha.ble.MeshTransport.WIFI) {
+                                    "Received via WiFi mesh (extended range). Tap to open distance tracker and response tools."
+                                } else {
+                                    "Signal strength ${alert.rssi} dBm. Tap to open distance tracker and response tools."
+                                },
                                 style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp),
                                 color = TextSecondary
                             )

@@ -146,7 +146,7 @@ class WifiMeshTransport(
                         // WiFi has no RSSI; distance buckets are BLE-derived, so the
                         // UI/notification layer keys off transport instead (see
                         // ReceivedSos.transport) rather than this placeholder.
-                        meshCore.ingest(packet, rssi = Int.MIN_VALUE, MeshTransport.WIFI)
+                        meshCore.ingest(packet, rssi = com.brokencoders.narisuraksha.ble.RSSI_WIFI_SENTINEL, MeshTransport.WIFI)
                     }
                 } catch (e: java.net.SocketTimeoutException) {
                     // Poll timeout: re-check wifi state, exit quietly if lost.

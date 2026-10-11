@@ -124,8 +124,12 @@ fun AlertScreen(
         }
     }
 
+    // WiFi receptions carry no RSSI: show the medium, never a dBm number.
+    val viaWifiMesh = rssi == com.brokencoders.narisuraksha.ble.RSSI_WIFI_SENTINEL
+
     // Distance bucket text in 48sp
     val distanceBucketText = when {
+        viaWifiMesh -> "via WiFi mesh"
         rssi >= -65 -> stringResource(R.string.distance_within_3m)
         rssi >= -80 -> stringResource(R.string.distance_3_to_10m)
         else -> stringResource(R.string.distance_over_10m)
@@ -240,9 +244,9 @@ fun AlertScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Signal strength chip
+                            // Signal strength chip (medium chip for WiFi: no RSSI exists)
                             StatusChip(
-                                label = "$rssi dBm",
+                                label = if (viaWifiMesh) "WiFi mesh" else "$rssi dBm",
                                 icon = Icons.Default.SignalCellularAlt,
                                 statusColor = GuardianBlue,
                                 containerColor = SoftPinkSurface
