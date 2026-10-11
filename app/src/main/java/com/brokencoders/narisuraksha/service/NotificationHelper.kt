@@ -114,6 +114,18 @@ class NotificationHelper(private val context: Context) {
     }
 
     fun showReceivedSosAlert(receivedSos: ReceivedSos) {
+        // Android 13+ requires POST_NOTIFICATIONS; without it, notify() throws
+        // SecurityException (caught below) and the emergency alert is silently lost.
+        // Check early so callers can fall back to in-app navigation.
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            val granted = androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.POST_NOTIFICATIONS
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            if (!granted) {
+                android.util.Log.w("NotificationHelper", "POST_NOTIFICATIONS not granted; skipping heads-up alert")
+                return
+            }
+        }
         val distanceBucket = Constants.getDistanceBucket(receivedSos.rssi)
 
         val launchIntent = Intent(context, MainActivity::class.java).apply {
@@ -139,7 +151,7 @@ class NotificationHelper(private val context: Context) {
             "Location: GPS unavailable (track via BLE RSSI)"
         }
 
-        val notification = NotificationCompat.Builder(context, Constants.CHANNEL_ALERT_ID)
+        val builder = NotificationCompat.Builder(context, Constants.CHANNEL_ALERT_ID)
             .setContentTitle("🚨 EMERGENCY SOS NEARBY (${distanceBucket.approxDistanceText})")
             .setContentText("Distress beacon detected! $locationText")
             .setStyle(
@@ -152,9 +164,24 @@ class NotificationHelper(private val context: Context) {
             .setAutoCancel(true)
             .setColor(0xFFD32F2F.toInt())
             .setContentIntent(pendingIntent)
-            .setFullScreenIntent(pendingIntent, true)
             .setVibrate(longArrayOf(0, 600, 200, 600, 200, 1000))
-            .build()
+
+        // Full-screen intent requires USE_FULL_SCREEN_INTENT on API 34+ (targetSdk 35);
+        // without the grant, notify() throws SecurityException. Only use it when allowed.
+        val canFullScreen = if (android.os.Build.VERSION.SDK_INT >= 34) {
+            try {
+                (context.getSystemService(Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager)
+                    ?.canUseFullScreenIntent() == true
+            } catch (_: Exception) {
+                false
+            }
+        } else {
+            true
+        }
+        if (canFullScreen) {
+            builder.setFullScreenIntent(pendingIntent, true)
+        }
+        val notification = builder.build()
 
         val notificationId = Constants.NOTIFICATION_ID_ALERT_BASE + (receivedSos.packet.senderId.toInt() and 0x7FF)
         try {

@@ -35,6 +35,8 @@ import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.Warning
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -45,6 +47,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -56,15 +59,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.brokencoders.narisuraksha.R
 import com.brokencoders.narisuraksha.ble.ReceivedSos
+import com.brokencoders.narisuraksha.core.PermissionHelper
 import com.brokencoders.narisuraksha.ui.components.AppBottomBar
 import com.brokencoders.narisuraksha.ui.components.CountdownOverlay
 import com.brokencoders.narisuraksha.ui.components.HeroBannerCard
+import com.brokencoders.narisuraksha.ui.components.InfoCard
 import com.brokencoders.narisuraksha.ui.components.LatestUpdatesCard
 import com.brokencoders.narisuraksha.ui.components.QuickActionCard
 import com.brokencoders.narisuraksha.ui.components.SafetyStatusCard
@@ -82,6 +91,7 @@ import com.brokencoders.narisuraksha.ui.theme.SafeGreenSurface
 import com.brokencoders.narisuraksha.ui.theme.SoftPinkSurface
 import com.brokencoders.narisuraksha.ui.theme.TextPrimary
 import com.brokencoders.narisuraksha.ui.theme.TextSecondary
+import com.brokencoders.narisuraksha.ui.theme.WarningAmber
 import com.brokencoders.narisuraksha.ui.viewmodels.MainViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -112,6 +122,50 @@ fun HomeScreen(
     val responderAckCount by viewModel.responderAckCount.collectAsState()
     val latestAlert by viewModel.latestReceivedAlert.collectAsState()
     val isScanEnabled by viewModel.isScanEnabled.collectAsState()
+
+    // Runtime permission state for offline BLE mesh + SOS. The redesign has no
+    // in-home permission recovery, so without this a fresh install that denies
+    // once can never start the guardian scan from Home.
+    val context = LocalContext.current
+    var hasPermissions by remember {
+        mutableStateOf(PermissionHelper.hasAllPermissions(context))
+    }
+    var hasBluetoothPerm by remember {
+        mutableStateOf(PermissionHelper.hasBluetoothPermissions(context))
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        hasPermissions = PermissionHelper.hasAllPermissions(context)
+        hasBluetoothPerm = PermissionHelper.hasBluetoothPermissions(context)
+        if (hasBluetoothPerm) {
+            viewModel.ensureGuardianScanActive()
+        }
+    }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                hasPermissions = PermissionHelper.hasAllPermissions(context)
+                hasBluetoothPerm = PermissionHelper.hasBluetoothPermissions(context)
+                if (hasBluetoothPerm) {
+                    viewModel.ensureGuardianScanActive()
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (hasBluetoothPerm) {
+            viewModel.ensureGuardianScanActive()
+        }
+    }
 
     val lastUpdatedText = remember(currentCoords) {
         currentCoords?.timestamp?.let {
@@ -257,6 +311,21 @@ fun HomeScreen(
                 }
 
                 // ==========================================
+                // PERMISSIONS REQUIRED (IF BLE/LOCATION DENIED)
+                // ==========================================
+                if (!hasPermissions) {
+                    PermissionBanner(
+                        onRequestPermissions = {
+                            permissionLauncher.launch(PermissionHelper.getRequiredPermissions().toTypedArray())
+                        },
+                        onOpenSettings = {
+                            PermissionHelper.openAppSettings(context)
+                        },
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                }
+
+                // ==========================================
                 // ACTIVE BROADCAST NOTIFICATION (IF LIVE SOS)
                 // ==========================================
                 if (isSosActive) {
@@ -280,6 +349,9 @@ fun HomeScreen(
                                 alert.packet.lon,
                                 alert.rssi
                             )
+                            // Consume the sticky alert so returning from Alert
+                            // doesn't re-show the banner and stack duplicates.
+                            viewModel.clearReceivedAlert()
                         },
                         modifier = Modifier.padding(bottom = 16.dp)
                     )
@@ -530,6 +602,91 @@ private fun ActiveSosCard(
                     ),
                     color = Color.White
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Prominent banner displayed when permissions required for offline mesh & SOS are missing.
+ */
+@Composable
+private fun PermissionBanner(
+    onRequestPermissions: () -> Unit,
+    onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    InfoCard(
+        modifier = modifier,
+        backgroundColor = WarningAmber.copy(alpha = 0.12f),
+        borderColor = WarningAmber
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(WarningAmber.copy(alpha = 0.2f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = WarningAmber,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Permissions Required",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 17.sp
+                        ),
+                        color = TextPrimary
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Bluetooth and Location are required for offline SOS broadcasting and beacon scanning.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondary
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(14.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Button(
+                    onClick = onRequestPermissions,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = PrimaryPink,
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(44.dp)
+                ) {
+                    Text("Grant Permissions", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                }
+                Button(
+                    onClick = onOpenSettings,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = SoftPinkSurface,
+                        contentColor = PrimaryPink
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.height(44.dp)
+                ) {
+                    Text("App Settings", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                }
             }
         }
     }

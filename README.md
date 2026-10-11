@@ -1,6 +1,6 @@
 # 🛡️ Nari-Suraksha (Silent SOS)
 > **"Network gayab, fir bhi help alive."**  
-> Offline-First Women's Safety & Peer-to-Peer Distress Broadcast System over Bluetooth Low Energy (BLE) with Decoy Mode, 2-Way Responder ACK, Emergency Contacts & Tactical Radar.
+> Offline-First Women's Safety & Multi-Hop BLE Mesh Distress System over Bluetooth Low Energy (BLE) with Decoy Mode, 2-Way Responder ACK, Emergency Contacts & Tactical Radar.
 
 [![Live Demo Web App](https://img.shields.io/badge/Live%20Demo-Vercel%20App-ff2d78?style=for-the-badge&logo=vercel&logoColor=white)](https://hackinverse-women-safety-sos-fronte.vercel.app/)
 [![Download Android APK](https://img.shields.io/badge/Download-Android%20APK%20(18.4MB)-e91e63?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Hasnainyt/hackinverse-women-safety-sos/raw/main/app-debug.apk)
@@ -11,7 +11,7 @@
 ## 🌐 Live Web Portal & Simulator
 
 👉 **[Launch Nari-Suraksha Live Web Hub (Vercel)](https://hackinverse-women-safety-sos-fronte.vercel.app/)**  
-*(Experience the interactive 3-Phone BLE multi-hop mesh simulation, 3-second countdown, Decoy Calculator PIN trigger, and Emergency Contacts action directly in your browser. Note: This web portal is an illustrative demonstration — web browsers do not broadcast native BLE packets. Download the Android APK for real hardware radio testing).*
+*(Experience the interactive 3-Phone BLE mesh simulation — Phone A (victim) → Phone B (relay) → Phone C (responder), plus the ACK return path — 3-second countdown, Decoy Calculator PIN trigger, and Emergency Contacts action directly in your browser. Note: This web portal is an illustrative demonstration — web browsers do not broadcast native BLE packets. Download the Android APK for real hardware radio testing).*
 
 ---
 
@@ -32,19 +32,19 @@ You can download and install the ready-to-run Android APK directly onto your pho
 ## 🌟 Overview
 **Nari-Suraksha** is an offline-first Android safety application designed for situations where **cellular networks, internet connectivity, or cloud servers are unavailable, jammed, or disabled**. 
 
-Using autonomous peer-to-peer **Bluetooth Low Energy (BLE) broadcasting**, an emergency signal is transmitted directly to nearby smartphones running the app without relying on telecom towers, SIM data, or Wi-Fi.
+Using autonomous multi-hop **Bluetooth Low Energy (BLE) mesh flooding**, an emergency signal hops from phone to phone — **Phone A (victim) → Phone B → Phone C → Phone D → …** — directly to nearby smartphones running the app, without relying on telecom towers, SIM data, or Wi-Fi. Every phone in range both **receives and re-broadcasts** the distress packet (with TTL decrement, deduplication, and battery-safe rate limits), so the alert travels far beyond a single Bluetooth range (~10–30 m per hop, up to 4 hops by default).
 
 ---
 
 ## 🚀 Key Features
 
-- 📴 **100% Offline Peer-to-Peer BLE Network**: Autonomous BLE advertisement using 16-bit Service UUID (`0xFDE1`) fitting within standard legacy 31-byte BLE packets (17-byte wire payload: `magic`, `version`, `senderId`, `timestamp/targetId`, `lat`, `lon`, `flags`).
-- 🌐 **Autonomous Multi-Hop Flooding Mesh Subsystem**:
-  - **Protocol V2 with 4-bit TTL**: Packets carry a Time-To-Live (default 3 hops) in the flags byte nibble, tripling signal range (~150m) across intermediary bystander phones.
-  - **Deterministic Relay Engine**: Drops own packets, drops expired packets (`TTL <= 1`), and enforces a strict 12-relay/min battery budget.
-  - **Bounded LRU Dedup Cache**: 60-second deduplication cache prevents re-broadcast loops and broadcast storms.
-  - **Collision-Mitigating Jitter (200–1500ms)**: Randomized scheduling prevents RF transmission collisions across adjacent receivers.
-  - **Advertiser Priority Queue**: Strict prioritization (`OWN_SOS > OWN_ACK > RELAY`) ensuring active emergency beacons preempt background mesh relays.
+- 📴 **100% Offline Multi-Hop BLE Mesh Network**: Autonomous BLE mesh flooding using 16-bit Service UUID (`0xFDE1`) fitting within standard legacy 31-byte BLE packets (17-byte wire payload: `magic`, `version`, `senderId`, `timestamp/targetId`, `lat`, `lon`, `flags+TTL`). Every device is simultaneously a **receiver and a relay**: Phone A broadcasts → Phone B re-broadcasts (TTL-1) → Phone C re-broadcasts (TTL-1) → Phone D, extending range hop-by-hop with no pairing and no internet.
+- 🕸️ **Flooding Mesh Relay Engine** (`BleScanner` → `RelayPolicy` → `BleAdvertiser`):
+  - **TTL-bounded hops**: each SOS starts with `TTL = 4` (protocol v2, upper 4 bits of the flags byte); every relay decrements TTL, stopping at 0.
+  - **Deduplication**: `RelayDedupCache` (256 entries, 60 s expiry) drops already-seen packets so loops and re-floods never multiply.
+  - **Battery-safe budgets**: max 12 relays/minute per device + 12/minute mesh budget, with 200–1500 ms randomized jitter to avoid air collisions.
+  - **Priority queue**: own SOS (rank 1) preempts own ACK (rank 2) and relay traffic (rank 3); the single hardware advertiser slot is never stolen by a relay.
+
 - ⚡ **Multi-Trigger SOS with 3-Second Confirmation**:
   - **1-Tap Pulsating Hero SOS Button** with tactile ring feedback.
   - **3-Shake Accelerometer Sensor**: Detects 3 rapid shakes (> 2.7g) within 2 seconds with a 3-second cooldown and 220ms debounce to prevent false alarms from table bumps.
@@ -90,6 +90,7 @@ The project is built on modern Android standards:
 - **Architecture Pattern**: Reactive MVVM / MVI with Kotlin Coroutines & `StateFlow` / `SharedFlow`
 - **Local Persistence**: Room 2.6 (Database `version = 2` with explicit migration `MIGRATION_1_2`) & Jetpack DataStore Preferences
 - **Hardware Integration**: Android Bluetooth Low Energy APIs (`BluetoothLeAdvertiser`, `BluetoothLeScanner`), Android Sensor Framework (`Sensor.TYPE_ACCELEROMETER`), Google Play Services Location (`FusedLocationProviderClient`)
+- **Mesh Relay Pipeline**: `BleScanner.processScanResult` → `RelayPolicy.evaluate` (ignore-own / dedup / TEST / ACK-routing / SOS) → `scheduleRelay` (TTL-1, jitter) → `BleAdvertiser.queueRelay` (priority queue, battery cap) → hardware broadcast; `RelayDedupCache` + `RelayBudgetTracker` + `PacketCodec` (TTL in flags byte, protocol v2)
 - **Target SDK**: Android 15 (API 35) | **Min SDK**: Android 8.0 (API 26)
 
 ---
@@ -110,12 +111,13 @@ To ensure universal compatibility across Android chipsets (Samsung, Xiaomi, Vivo
   ├── UUID: 0xFDE1 (2 bytes)
   └── SOS Wire Payload: 17 Bytes
         ├── Offset 0:     Magic Byte: 0x53 ('S') (1 byte)
-        ├── Offset 1:     Protocol Version: 0x01 (1 byte)
+        ├── Offset 1:     Protocol Version: 0x02 (mesh TTL; 0x01 = legacy, TTL treated as 0) (1 byte)
         ├── Offset 2..3:  Sender ID: Short (2 bytes, Big-Endian)
         ├── Offset 4..7:  Timestamp / Target Sender ID: Int (4 bytes, Big-Endian)
         ├── Offset 8..11: Latitude: Float IEEE 754 (4 bytes)
         ├── Offset 12..15: Longitude: Float IEEE 754 (4 bytes)
-        └── Offset 16:    Flags: (1 byte)
+        └── Offset 16:    Flags + TTL: (1 byte)
+                          ├── Bits 7..4: TTL / hop budget, 0–15 (default 4; decremented per relay)
                           ├── Bit 0: SOS Active (0x01)
                           ├── Bit 1: Location Unavailable (0x02)
                           ├── Bit 2: ACK Beacon (0x04)
@@ -124,14 +126,28 @@ To ensure universal compatibility across Android chipsets (Samsung, Xiaomi, Vivo
 Total AD Structure: 4 (Record 1) + 21 (Record 2) = 25 Bytes <= 31 Bytes (Universal compatibility)
 ```
 
-### 2-Way Handshake ACK Flow
-1. **Phone A (Victim)** triggers SOS and broadcasts with `senderId = 0x1A2B`, `flags = 0x01 (SOS)`.
-2. **Phone B (Responder)** discovers Phone A's beacon and displays the Incoming Alert screen.
-3. Responder taps **"I AM RESPONDING"**.
-4. **Phone B** broadcasts an ACK beacon with:
+> **Legacy fallback**: 15-byte unversioned packets (no magic/version, TTL = 0, never relayed) still decode for backwards compatibility.
+
+### 🕸️ Mesh SOS Relay Flow (Phone A → B → C → D … via Bluetooth)
+
+No pairing. No internet. Every phone running the app is a relay node:
+
+1. **Phone A (Victim)** triggers SOS and broadcasts with `senderId = 0x1A2B`, `flags = SOS`, `TTL = 4`.
+2. **Phone B** (within ~10–30 m BLE range) scans and discovers Phone A's beacon:
+   - Displays the Incoming Alert screen locally (`ALERT_AND_RELAY`).
+   - Waits a random 200–1500 ms (collision avoidance), decrements TTL to 3, and **re-broadcasts** the same distress packet.
+3. **Phone C** (out of Phone A's range, but in Phone B's range) receives Phone B's relay (`TTL = 3`), alerts locally, re-broadcasts with `TTL = 2`.
+4. **Phone D** receives from Phone C (`TTL = 2`), alerts locally, re-broadcasts with `TTL = 1` — and so on until `TTL = 0`, which is delivered locally but never forwarded again.
+5. **Loop protection**: if Phone B hears its own relay echoed back (same `senderId + timestamp + flags`), `RelayDedupCache` drops it as a duplicate; per-sender (10 s) and global (10/min) rate limits stop spoof floods; TEST beacons (`FLAG_TEST`) alert locally but are never relayed.
+
+### 2-Way Handshake ACK Flow (Responder → Victim, also via mesh)
+1. **Phone D (Responder)** discovers the relayed SOS and displays the Incoming Alert screen.
+2. Responder taps **"I AM RESPONDING"**.
+3. **Phone D** broadcasts an ACK beacon with:
    - `senderId = 0x5C6D` (Responder's device ID)
    - `timestamp = 0x1A2B` (Carries Phone A's sender ID as `targetSenderId`)
-   - `flags = 0x04 (ACK)`
+   - `flags = ACK`, `TTL = 4`
+4. **Intermediate phones (C, B)** see an ACK addressed to someone else (`RELAY_ONLY`): no alert, just TTL-decrement + re-broadcast toward Phone A.
 5. **Phone A** receives the ACK:
    - Validates `targetSenderId == myDeviceId`.
    - Deduplicates responder: adds `0x5C6D` to unique `Set<Short>`.

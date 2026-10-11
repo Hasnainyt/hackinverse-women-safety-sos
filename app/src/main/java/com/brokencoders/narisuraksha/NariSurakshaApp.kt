@@ -43,6 +43,14 @@ class NariSurakshaApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // Eagerly create notification channels on the app thread so the first
+        // foreground service start never pays channel-creation cost inside its
+        // ~10s startForeground timeout window.
+        try {
+            notificationHelper
+        } catch (e: Exception) {
+            Log.w("NariSurakshaApp", "Notification channel init failed: ${e.message}")
+        }
         Log.i("NariSurakshaApp", "Application initialized with Anonymous Device ID: ${deviceIdProvider.deviceId}")
 
         // Explicitly wire BLE mesh relay forwarding so scanner delegates directly to advertiser

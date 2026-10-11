@@ -423,12 +423,18 @@ fun AlertScreen(
                         ) {
                             Button(
                                 onClick = {
-                                    val geoUri = Uri.parse("geo:$lat,$lon?q=$lat,$lon(Distress+SOS+Location)")
-                                    val mapIntent = Intent(Intent.ACTION_VIEW, geoUri)
-                                    if (mapIntent.resolveActivity(context.packageManager) != null) {
-                                        context.startActivity(mapIntent)
-                                    } else {
+                                    try {
+                                        val geoUri = Uri.parse("geo:$lat,$lon?q=$lat,$lon(Distress+SOS+Location)")
+                                        val mapIntent = Intent(Intent.ACTION_VIEW, geoUri)
+                                        if (mapIntent.resolveActivity(context.packageManager) != null) {
+                                            context.startActivity(mapIntent)
+                                        } else {
+                                            Toast.makeText(context, "No offline map app installed", Toast.LENGTH_SHORT).show()
+                                        }
+                                    } catch (e: android.content.ActivityNotFoundException) {
                                         Toast.makeText(context, "No offline map app installed", Toast.LENGTH_SHORT).show()
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Could not open maps", Toast.LENGTH_SHORT).show()
                                     }
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryPink),
@@ -455,10 +461,14 @@ fun AlertScreen(
                                 icon = Icons.Default.ContentCopy,
                                 height = 56.dp,
                                 onClick = {
-                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                    val clip = ClipData.newPlainText("SOS Coordinates", "$lat, $lon")
-                                    clipboard.setPrimaryClip(clip)
-                                    Toast.makeText(context, context.getString(R.string.coordinates_copied), Toast.LENGTH_SHORT).show()
+                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                                    if (clipboard == null) {
+                                        Toast.makeText(context, "Clipboard unavailable", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        val clip = ClipData.newPlainText("SOS Coordinates", "$lat, $lon")
+                                        clipboard.setPrimaryClip(clip)
+                                        Toast.makeText(context, context.getString(R.string.coordinates_copied), Toast.LENGTH_SHORT).show()
+                                    }
                                 },
                                 modifier = Modifier.weight(1f)
                             )

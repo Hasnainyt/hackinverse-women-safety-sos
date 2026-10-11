@@ -88,9 +88,19 @@ class SosForegroundService : Service() {
         )
 
         Log.i(TAG, "Starting BLE broadcast for packet: $packet")
-        bleTransport.startAdvertising(packet)
+        try {
+            bleTransport.startAdvertising(packet)
+        } catch (e: SecurityException) {
+            Log.e(TAG, "SOS broadcast aborted: missing BLUETOOTH_ADVERTISE permission", e)
+            stopSelf()
+            return
+        }
         // Ensure device is scanning simultaneously so incoming responder ACKs are captured!
-        bleTransport.startScanning()
+        try {
+            bleTransport.startScanning()
+        } catch (e: SecurityException) {
+            Log.w(TAG, "SOS ACK scan unavailable: missing BLUETOOTH_SCAN permission", e)
+        }
 
         serviceScope.launch {
             // Persist SENT event to Room
@@ -124,6 +134,11 @@ class SosForegroundService : Service() {
             Log.e(TAG, "Error stopping advertising in onDestroy", e)
         }
         serviceScope.cancel()
+        try {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } catch (_: Exception) {
+            // Pre-O fallback handled by stopSelf below
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -155,10 +170,11 @@ class SosForegroundService : Service() {
         }
 
         fun stop(context: Context) {
-            val intent = Intent(context, SosForegroundService::class.java).apply {
-                action = ACTION_STOP_SOS
+            try {
+                context.stopService(Intent(context, SosForegroundService::class.java))
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to stop SosForegroundService: ${e.message}", e)
             }
-            context.startService(intent)
         }
     }
 }

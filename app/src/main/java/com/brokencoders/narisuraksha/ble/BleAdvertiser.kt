@@ -137,7 +137,7 @@ class AndroidHardwareAdvertiser(
             }
         }
 
-        activeCallback = cb
+        activeCallback = null
 
         try {
             if (scanResponse != null) {
@@ -145,8 +145,10 @@ class AndroidHardwareAdvertiser(
             } else {
                 advertiser.startAdvertising(settings, data, cb)
             }
+            activeCallback = cb
         } catch (e: Exception) {
             Log.e(TAG, "Exception starting BLE advertisement on hardware", e)
+            activeCallback = null
             onFailure(AdvertiseCallback.ADVERTISE_FAILED_INTERNAL_ERROR)
         }
     }
@@ -232,6 +234,7 @@ class BleAdvertiser(
             throw IllegalArgumentException("Context required when customHardwareAdvertiser is not provided")
         }
 
+    @Volatile
     var isAdvertising = false
         private set
 
@@ -436,18 +439,22 @@ class BleAdvertiser(
                 if (isTransient && startRetryCount < 1) {
                     startRetryCount++
                     Log.w(TAG, "Transient advertising failure (Code $errorCode). Retrying once in 200ms...")
+                    // Snapshot the failed request: a higher-priority SOS enqueued during
+                    // the 200ms window must not be clobbered by a stale re-dispatch.
+                    val failedRequest = request
                     externalScope.launch {
                         delay(200L)
-                        stopHardwareOnly()
-                        val req = synchronized(stateLock) {
-                            val p = currentPacket
-                            val prio = currentPriority
-                            if (p != null && prio != null) QueuedAdv(p, prio, currentDurationMs) else null
-                        }
-                        if (req != null) {
-                            dispatchHardware(req)
-                        } else {
-                            advanceQueue()
+                        val currentAtRetry: SosPacket? = synchronized(stateLock) { currentPacket }
+                        when {
+                            // Still the failed slot (nothing preempted) -> retry it.
+                            currentAtRetry === failedRequest.packet -> {
+                                stopHardwareOnly()
+                                dispatchHardware(failedRequest)
+                            }
+                            // Slot went idle (stopAll/stop) -> drain queue normally.
+                            currentAtRetry == null -> advanceQueue()
+                            // A newer packet (e.g. preempting SOS) took over -> leave it alone.
+                            else -> Unit
                         }
                     }
                     return@startAdvertising
@@ -475,7 +482,9 @@ class BleAdvertiser(
                     isError = true
                 )
 
-                advanceQueue()
+                // Dispatch async to avoid synchronous recursion (StackOverflowError)
+                // when the hardware layer fails synchronously for every queued item.
+                externalScope.launch { advanceQueue() }
             }
         )
     }
