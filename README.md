@@ -2,7 +2,7 @@
 > **"Network gayab, fir bhi help alive."**  
 > Offline-First Women's Safety & Multi-Hop BLE Mesh Distress System over Bluetooth Low Energy (BLE) with Decoy Mode, 2-Way Responder ACK, Emergency Contacts & Tactical Radar.
 
-[![Live Demo Web App](https://img.shields.io/badge/Live%20Demo-Vercel%20App-ff2d78?style=for-the-badge&logo=vercel&logoColor=white)](https://hackinverse-women-safety.vercel.app/)
+[![Live Demo Web App](https://img.shields.io/badge/Live%20Demo-Vercel%20App-ff2d78?style=for-the-badge&logo=vercel&logoColor=white)](https://hackinverse-women-safety-sos-fronte.vercel.app/)
 [![Download Android APK](https://img.shields.io/badge/Download-Android%20APK%20(18.4MB)-e91e63?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Hasnainyt/hackinverse-women-safety-sos/raw/main/app-debug.apk)
 [![GitHub Repo](https://img.shields.io/badge/GitHub-Repository-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Hasnainyt/hackinverse-women-safety-sos)
 
@@ -10,7 +10,7 @@
 
 ## 🌐 Live Web Portal & Simulator
 
-👉 **[Launch Nari-Suraksha Live Web Hub (Vercel)](https://hackinverse-women-safety.vercel.app/)**  
+👉 **[Launch Nari-Suraksha Live Web Hub (Vercel)](https://hackinverse-women-safety-sos-fronte.vercel.app/)**  
 *(Experience the interactive 3-Phone BLE mesh simulation — Phone A (victim) → Phone B (relay) → Phone C (responder), plus the ACK return path — 3-second countdown, Decoy Calculator PIN trigger, and Emergency Contacts action directly in your browser. Note: This web portal is an illustrative demonstration — web browsers do not broadcast native BLE packets. Download the Android APK for real hardware radio testing).*
 
 ---
