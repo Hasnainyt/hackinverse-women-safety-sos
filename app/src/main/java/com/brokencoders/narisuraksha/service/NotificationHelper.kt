@@ -126,7 +126,14 @@ class NotificationHelper(private val context: Context) {
                 return
             }
         }
+        val viaWifi = receivedSos.transport == com.brokencoders.narisuraksha.ble.MeshTransport.WIFI ||
+            receivedSos.rssi == com.brokencoders.narisuraksha.ble.RSSI_WIFI_SENTINEL
         val distanceBucket = Constants.getDistanceBucket(receivedSos.rssi)
+        val proximityText = if (viaWifi) {
+            "via WiFi mesh (extended range)"
+        } else {
+            "${distanceBucket.label} (${distanceBucket.approxDistanceText}, RSSI: ${receivedSos.rssi} dBm)"
+        }
 
         val launchIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -148,15 +155,16 @@ class NotificationHelper(private val context: Context) {
         val locationText = if (!receivedSos.packet.isLocationUnavailable && (receivedSos.packet.lat != 0f || receivedSos.packet.lon != 0f)) {
             "GPS: ${String.format("%.4f", receivedSos.packet.lat)}, ${String.format("%.4f", receivedSos.packet.lon)}"
         } else {
-            "Location: GPS unavailable (track via BLE RSSI)"
+            if (viaWifi) "Location: GPS unavailable (track via mesh proximity)"
+            else "Location: GPS unavailable (track via BLE RSSI)"
         }
 
         val builder = NotificationCompat.Builder(context, Constants.CHANNEL_ALERT_ID)
-            .setContentTitle("🚨 EMERGENCY SOS NEARBY (${distanceBucket.approxDistanceText})")
+            .setContentTitle("🚨 EMERGENCY SOS NEARBY (${if (viaWifi) "WiFi mesh" else distanceBucket.approxDistanceText})")
             .setContentText("Distress beacon detected! $locationText")
             .setStyle(
                 NotificationCompat.BigTextStyle()
-                    .bigText("🚨 DISTRESS BEACON DETECTED NEARBY!\n\nDistance: ${distanceBucket.label} (${distanceBucket.approxDistanceText}, RSSI: ${receivedSos.rssi} dBm)\n$locationText\n\nTap immediately to view coordinates or send acknowledgment.")
+                    .bigText("🚨 DISTRESS BEACON DETECTED NEARBY!\n\nDistance: $proximityText\n$locationText\n\nTap immediately to view coordinates or send acknowledgment.")
             )
             .setSmallIcon(R.drawable.ic_calculator_launcher)
             .setPriority(NotificationCompat.PRIORITY_MAX)
