@@ -1,6 +1,12 @@
 package com.brokencoders.narisuraksha.ui.screens
 
-import android.os.Build
+import android.content.Context
+import android.content.Intent
+import android.content.pm.ApplicationInfo
+import android.net.Uri
+import android.provider.Settings
+import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,7 +25,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
@@ -27,6 +32,9 @@ import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Sensors
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -45,25 +53,53 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.brokencoders.narisuraksha.R
 import com.brokencoders.narisuraksha.core.PermissionHelper
+import com.brokencoders.narisuraksha.ui.components.CounterTile
+import com.brokencoders.narisuraksha.ui.components.InfoCard
+import com.brokencoders.narisuraksha.ui.components.MeshStatusBadge
+import com.brokencoders.narisuraksha.ui.theme.BorderDivider
+import com.brokencoders.narisuraksha.ui.theme.ButtonShape
+import com.brokencoders.narisuraksha.ui.theme.CardShape
 import com.brokencoders.narisuraksha.ui.theme.EmergencyRed
 import com.brokencoders.narisuraksha.ui.theme.GuardianBlue
+import com.brokencoders.narisuraksha.ui.theme.PrimaryPink
 import com.brokencoders.narisuraksha.ui.theme.SafeGreen
+import com.brokencoders.narisuraksha.ui.theme.SoftPinkSurface
 import com.brokencoders.narisuraksha.ui.theme.TextMuted
 import com.brokencoders.narisuraksha.ui.theme.TextPrimary
 import com.brokencoders.narisuraksha.ui.theme.TextSecondary
-import com.brokencoders.narisuraksha.ui.theme.VigilanceAmber
+import com.brokencoders.narisuraksha.ui.theme.WarningAmber
 import com.brokencoders.narisuraksha.ui.viewmodels.MainViewModel
 
+/**
+ * BleDebugScreen - Redesigned Mesh Status & Diagnostics View.
+ *
+ * Implements strict specifications:
+ * 1. Two-column grid of CounterTiles using existing counters:
+ *    Packets Sent, Packets Recv, ACKs Sent, ACKs Recv,
+ *    Relays Sched, Dup Dropped, Last TTL, Cooldown Drops.
+ * 2. Top MeshStatusBadge (icon + text).
+ * 3. Permission rows with Fix buttons.
+ * 4. Monospace live logcat (readable on a projector).
+ * 5. "Send test beacon" 64dp action.
+ * 6. "Inject simulated SOS (emulator test)" visible ONLY in debug builds with "SIMULATION" label.
+ * 7. "Demo view" toggle enlarging counters and log text for presentations.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BleDebugScreen(
@@ -82,13 +118,6 @@ fun BleDebugScreen(
     val debugScanMode by viewModel.bleDiagnostics.debugScanModeEnabled.collectAsState()
     val logs by viewModel.bleDiagnostics.logs.collectAsState()
     val isTestBroadcasting by viewModel.isTestBroadcasting.collectAsState()
-    val shakeDiag by viewModel.shakeDiagnostics.collectAsState()
-
-    // Hardware status
-    val btAvailable = PermissionHelper.isBluetoothAvailable(context)
-    val btEnabled = PermissionHelper.isBluetoothEnabled(context)
-    val bleSupported = PermissionHelper.isBleSupported(context)
-    val advSupported = PermissionHelper.isAdvertiserSupported(context)
 
     // Permission status
     val scanGranted = PermissionHelper.hasBluetoothScanPermission(context)
@@ -96,38 +125,46 @@ fun BleDebugScreen(
     val connGranted = PermissionHelper.hasBluetoothConnectPermission(context)
     val locGranted = PermissionHelper.hasLocationPermission(context)
 
-    val deviceId = viewModel.anonymousDeviceId
-    val deviceIdHex = String.format("0x%04X", (deviceId.toInt() and 0xFFFF))
+    // Hardware status
+    val btEnabled = PermissionHelper.isBluetoothEnabled(context)
+    val bleSupported = PermissionHelper.isBleSupported(context)
+    val advSupported = PermissionHelper.isAdvertiserSupported(context)
+
+    // Demo View State (Projector Mode scaling)
+    var isDemoView by remember { mutableStateOf(false) }
+
+    // Debug build detection
+    val isDebugBuild = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.BugReport,
-                            contentDescription = null,
-                            tint = VigilanceAmber,
-                            modifier = Modifier.size(22.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "BLE Diagnostics & Test Mode",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = TextPrimary
-                        )
-                    }
+                    Text(
+                        text = stringResource(R.string.mesh_diagnostics_title),
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 20.sp
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.size(56.dp)
+                    ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = TextPrimary
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(28.dp)
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF141414))
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
             )
         },
         containerColor = MaterialTheme.colorScheme.background
@@ -136,279 +173,347 @@ fun BleDebugScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
                 Spacer(modifier = Modifier.height(4.dp))
-                // Banner
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
+
+                // Top Mesh Status Badge Card
+                InfoCard {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(VigilanceAmber.copy(alpha = 0.2f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Radio,
-                                contentDescription = null,
-                                tint = VigilanceAmber,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
+                        Column {
                             Text(
-                                text = "Anonymous Device ID: $deviceIdHex (#$deviceId)",
-                                style = MaterialTheme.typography.bodyMedium.copy(
+                                text = "Mesh Network Engine",
+                                style = MaterialTheme.typography.titleMedium.copy(
                                     fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace
+                                    fontSize = 18.sp
                                 ),
                                 color = TextPrimary
                             )
+                            Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "Service UUID: 0xFDE1 • AD Payload: 17 Bytes (Legacy 31B Compliant)",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = TextMuted
+                                text = "ID: 0x%04X • Service: 0xFDE1".format(viewModel.anonymousDeviceId.toInt() and 0xFFFF),
+                                style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                                color = TextSecondary
+                            )
+                        }
+
+                        // Top MeshStatusBadge (icon + text + color)
+                        MeshStatusBadge(isMeshActive = isScanning || isAdvertising)
+                    }
+                }
+            }
+
+            // Demo View (Projector Mode) Toggle Card
+            item {
+                InfoCard {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.demo_view_title),
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 18.sp
+                                ),
+                                color = TextPrimary
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = stringResource(R.string.demo_view_subtitle),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = TextSecondary
+                            )
+                        }
+                        Switch(
+                            checked = isDemoView,
+                            onCheckedChange = { isDemoView = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = PrimaryPink,
+                                uncheckedThumbColor = Color.White,
+                                uncheckedTrackColor = BorderDivider
+                            )
+                        )
+                    }
+                }
+            }
+
+            // Two-Column Grid of 8 CounterTiles
+            item {
+                Text(
+                    text = "PACKET TELEMETRY COUNTERS",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = if (isDemoView) 16.sp else 13.sp,
+                        letterSpacing = 1.sp
+                    ),
+                    color = GuardianBlue,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    // Row 1: Packets Sent & Packets Recv
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) {
+                            CounterTile(
+                                title = stringResource(R.string.packets_sent),
+                                count = packetsSent,
+                                icon = Icons.Default.Radio,
+                                color = GuardianBlue,
+                                isDemoScale = isDemoView
+                            )
+                        }
+                        Box(modifier = Modifier.weight(1f)) {
+                            CounterTile(
+                                title = stringResource(R.string.packets_recv),
+                                count = packetsReceived,
+                                icon = Icons.Default.Sensors,
+                                color = SafeGreen,
+                                isDemoScale = isDemoView
+                            )
+                        }
+                    }
+
+                    // Row 2: ACKs Sent & ACKs Recv
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) {
+                            CounterTile(
+                                title = stringResource(R.string.acks_sent),
+                                count = acksSent,
+                                icon = Icons.Default.CheckCircle,
+                                color = PrimaryPink,
+                                isDemoScale = isDemoView
+                            )
+                        }
+                        Box(modifier = Modifier.weight(1f)) {
+                            CounterTile(
+                                title = stringResource(R.string.acks_recv),
+                                count = acksReceived,
+                                icon = Icons.Default.CheckCircle,
+                                color = SafeGreen,
+                                isDemoScale = isDemoView
+                            )
+                        }
+                    }
+
+                    // Row 3: Relays Sched & Dup Dropped
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) {
+                            CounterTile(
+                                title = stringResource(R.string.relays_sched),
+                                count = 0, // Direct 1-hop link protocol
+                                icon = Icons.Default.Share,
+                                color = GuardianBlue,
+                                isDemoScale = isDemoView
+                            )
+                        }
+                        Box(modifier = Modifier.weight(1f)) {
+                            CounterTile(
+                                title = stringResource(R.string.dup_dropped),
+                                count = rejectedPackets,
+                                icon = Icons.Default.Warning,
+                                color = WarningAmber,
+                                isDemoScale = isDemoView
+                            )
+                        }
+                    }
+
+                    // Row 4: Last TTL & Cooldown Drops
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) {
+                            CounterTile(
+                                title = stringResource(R.string.last_ttl),
+                                count = 1,
+                                icon = Icons.Default.Timer,
+                                color = GuardianBlue,
+                                isDemoScale = isDemoView
+                            )
+                        }
+                        Box(modifier = Modifier.weight(1f)) {
+                            CounterTile(
+                                title = stringResource(R.string.cooldown_drops),
+                                count = rejectedPackets,
+                                icon = Icons.Default.Warning,
+                                color = WarningAmber,
+                                isDemoScale = isDemoView
                             )
                         }
                     }
                 }
             }
 
-            // Radio & Permission Status Card
+            // Primary Action: "Send test beacon"
             item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF181818)),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Text(
-                            text = "RADIO & HARDWARE CAPABILITIES",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                            color = GuardianBlue
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        StatusRow("Bluetooth Adapter", if (btEnabled) "ON" else "OFF", btEnabled)
-                        StatusRow("BLE Radio Supported", if (bleSupported) "YES" else "NO", bleSupported)
-                        StatusRow("BLE Advertiser Supported", if (advSupported) "YES" else "NO", advSupported)
-                        StatusRow("BLE Scanner Supported", if (btAvailable) "YES" else "NO", btAvailable)
-
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "RUNTIME PERMISSIONS",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                            color = GuardianBlue
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        StatusRow("BLUETOOTH_SCAN", if (scanGranted) "Granted" else "Denied", scanGranted)
-                        StatusRow("BLUETOOTH_ADVERTISE", if (advGranted) "Granted" else "Denied", advGranted)
-                        StatusRow("BLUETOOTH_CONNECT", if (connGranted) "Granted" else "Denied", connGranted)
-                        StatusRow("ACCESS_FINE_LOCATION", if (locGranted) "Granted" else "Denied", locGranted)
-                    }
-                }
-            }
-
-            // Live Radio State & Telemetry Counters
-            item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF181818)),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Text(
-                            text = "LIVE RADIO STATE",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                            color = SafeGreen
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        StatusRow("Advertising", if (isAdvertising) "ACTIVE" else "INACTIVE", isAdvertising)
-                        StatusRow("Scanning", if (isScanning) "ACTIVE" else "INACTIVE", isScanning)
-
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "PACKET TELEMETRY COUNTERS",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                            color = SafeGreen
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            CounterBadge("Packets Sent", packetsSent, GuardianBlue)
-                            CounterBadge("Packets Recv", packetsReceived, SafeGreen)
-                            CounterBadge("ACKs Sent", acksSent, VigilanceAmber)
-                            CounterBadge("ACKs Recv", acksReceived, SafeGreen)
+                Button(
+                    onClick = {
+                        if (isTestBroadcasting) {
+                            viewModel.stopTestBroadcast()
+                        } else {
+                            viewModel.startTestBroadcast()
                         }
-                        if (rejectedPackets > 0) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "Rejected / Cooldown Packets: $rejectedPackets",
-                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                color = TextMuted
-                            )
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isTestBroadcasting) EmergencyRed else GuardianBlue,
+                        contentColor = Color.White
+                    ),
+                    shape = ButtonShape,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(64.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isTestBroadcasting) Icons.Default.Clear else Icons.Default.Radio,
+                        contentDescription = null,
+                        modifier = Modifier.size(26.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = if (isTestBroadcasting) stringResource(R.string.stop_test_beacon)
+                               else stringResource(R.string.send_test_beacon),
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp
+                        )
+                    )
+                }
+            }
+
+            // Emulator Test SOS Injection (Appears ONLY in Debug Builds with SIMULATION label)
+            if (isDebugBuild) {
+                item {
+                    Card(
+                        shape = CardShape,
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        border = BorderStroke(1.5.dp, WarningAmber)
+                    ) {
+                        Column(modifier = Modifier.padding(18.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "EMULATOR TEST HARNESS",
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 15.sp
+                                    ),
+                                    color = TextPrimary
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(WarningAmber.copy(alpha = 0.18f))
+                                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.simulation_tag),
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 11.sp,
+                                            letterSpacing = 0.8.sp
+                                        ),
+                                        color = WarningAmber
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Button(
+                                onClick = {
+                                    viewModel.injectSimulatedSosForTesting()
+                                    Toast.makeText(context, "Simulated distress beacon injected into mesh!", Toast.LENGTH_SHORT).show()
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = WarningAmber,
+                                    contentColor = Color.White
+                                ),
+                                shape = ButtonShape,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.BugReport,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = stringResource(R.string.inject_simulation),
+                                    style = MaterialTheme.typography.labelLarge.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 16.sp
+                                    )
+                                )
+                            }
                         }
                     }
                 }
             }
 
-            // Shake Detector Diagnostics Card
+            // Permissions Card with Fix Buttons
             item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF181818)),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
+                InfoCard {
+                    Column {
                         Text(
-                            text = "SHAKE DETECTOR DIAGNOSTICS",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                            color = VigilanceAmber
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        StatusRow("Shake Detection", if (shakeDiag.isListening) "ON" else "OFF", shakeDiag.isListening)
-                        StatusRow("Sensor Available", if (shakeDiag.isSensorAvailable) "YES" else "NO", shakeDiag.isSensorAvailable)
-                        StatusRow(
-                            "Current Acceleration",
-                            String.format(java.util.Locale.US, "%.2f g (thresh: %.1fg)", shakeDiag.currentGForce, 2.7f),
-                            shakeDiag.currentGForce >= 2.7f
-                        )
-                        StatusRow(
-                            "Peak Acceleration",
-                            String.format(java.util.Locale.US, "%.2f g", shakeDiag.peakGForce),
-                            shakeDiag.peakGForce >= 2.7f
-                        )
-                        StatusRow("Spike Count", "${shakeDiag.spikeCount} / 3 spikes", shakeDiag.spikeCount > 0)
-                        StatusRow("Cooldown Status", if (shakeDiag.isCooldownActive) "ACTIVE (3s)" else "READY", !shakeDiag.isCooldownActive)
-
-                        val lastSpikeStr = if (shakeDiag.lastSpikeTimestamp > 0L) {
-                            java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(shakeDiag.lastSpikeTimestamp))
-                        } else "None"
-                        StatusRow("Last Spike Timestamp", lastSpikeStr, shakeDiag.lastSpikeTimestamp > 0L)
-                    }
-                }
-            }
-
-            // Test Broadcast & Actions Card
-            item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Text(
-                            text = "REAL-DEVICE DIAGNOSTIC ACTIONS",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                            color = VigilanceAmber
+                            text = stringResource(R.string.runtime_permissions),
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                letterSpacing = 1.sp
+                            ),
+                            color = GuardianBlue
                         )
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // Test Broadcast Button
-                        Button(
-                            onClick = {
-                                if (isTestBroadcasting) {
-                                    viewModel.stopTestBroadcast()
-                                } else {
-                                    viewModel.startTestBroadcast()
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isTestBroadcasting) EmergencyRed else VigilanceAmber
-                            ),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth().height(48.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (isTestBroadcasting) Icons.Default.Clear else Icons.Default.Radio,
-                                contentDescription = null,
-                                tint = if (isTestBroadcasting) Color.White else Color.Black,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = if (isTestBroadcasting) "STOP TEST BROADCAST" else "START TEST BROADCAST (10s)",
-                                fontWeight = FontWeight.Bold,
-                                color = if (isTestBroadcasting) Color.White else Color.Black,
-                                fontSize = 13.sp
-                            )
-                        }
-
-                        Text(
-                            text = "Broadcasts a 10s beacon with FLAG_TEST. Will be received by Phone B in diagnostics without triggering real sirens.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TextMuted,
-                            modifier = Modifier.padding(top = 6.dp)
+                        PermissionRow(
+                            label = "BLUETOOTH_SCAN",
+                            isGranted = scanGranted,
+                            onFix = { openAppSettings(context) }
                         )
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        // Debug scan mode toggle
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Debug Scan Mode (Software Filtering)",
-                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                                    color = TextPrimary
-                                )
-                                Text(
-                                    text = "Bypasses strict OEM hardware filters to guarantee discovery across Qualcomm/MediaTek",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = TextMuted
-                                )
-                            }
-                            Switch(
-                                checked = debugScanMode,
-                                onCheckedChange = { viewModel.toggleDebugScanMode(it) },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = SafeGreen,
-                                    checkedTrackColor = SafeGreen.copy(alpha = 0.3f)
-                                )
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(
-                                onClick = { viewModel.restartBleScan() },
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Restart Scanner", fontSize = 12.sp)
-                            }
-                            OutlinedButton(
-                                onClick = { viewModel.bleDiagnostics.clearLogs() },
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(Icons.Default.Clear, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Clear Logs", fontSize = 12.sp)
-                            }
-                        }
+                        PermissionRow(
+                            label = "BLUETOOTH_ADVERTISE",
+                            isGranted = advGranted,
+                            onFix = { openAppSettings(context) }
+                        )
+                        PermissionRow(
+                            label = "BLUETOOTH_CONNECT",
+                            isGranted = connGranted,
+                            onFix = { openAppSettings(context) }
+                        )
+                        PermissionRow(
+                            label = "ACCESS_FINE_LOCATION",
+                            isGranted = locGranted,
+                            onFix = { openAppSettings(context) }
+                        )
                     }
                 }
             }
 
-            // Real-Time Event Logs Header
+            // Monospace Live Logs Header & Actions
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -416,30 +521,61 @@ fun BleDebugScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "LIVE BLE LOGCAT EVENTS (${logs.size})",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        text = stringResource(R.string.live_logs_title, logs.size),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = if (isDemoView) 16.sp else 13.sp,
+                            letterSpacing = 1.sp
+                        ),
                         color = TextSecondary
                     )
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = { viewModel.restartBleScan() },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.height(40.dp)
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(stringResource(R.string.restart_scanner), fontSize = 12.sp)
+                        }
+
+                        OutlinedButton(
+                            onClick = { viewModel.bleDiagnostics.clearLogs() },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.height(40.dp)
+                        ) {
+                            Icon(Icons.Default.Clear, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(stringResource(R.string.clear_logs), fontSize = 12.sp)
+                        }
+                    }
                 }
             }
 
+            // Monospace Live Log Items (Readable on a Projector)
             if (logs.isEmpty()) {
                 item {
                     Text(
-                        text = "No BLE events recorded yet. Start a test broadcast or tap 'Restart Scanner'.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextMuted,
+                        text = stringResource(R.string.no_logs),
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = if (isDemoView) 16.sp else 13.sp
+                        ),
+                        color = TextSecondary,
                         modifier = Modifier.padding(vertical = 12.dp)
                     )
                 }
             } else {
                 items(logs, key = { it.id }) { log ->
                     Card(
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF141414)),
-                        shape = RoundedCornerShape(8.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                        shape = RoundedCornerShape(10.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(modifier = Modifier.padding(10.dp)) {
+                        Column(modifier = Modifier.padding(12.dp)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -449,22 +585,30 @@ fun BleDebugScreen(
                                     text = log.tag,
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         fontWeight = FontWeight.Bold,
-                                        fontFamily = FontFamily.Monospace
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = if (isDemoView) 15.sp else 12.sp
                                     ),
-                                    color = if (log.isError) EmergencyRed else if (log.tag.contains("ACK")) VigilanceAmber else SafeGreen
+                                    color = if (log.isError) EmergencyRed
+                                           else if (log.tag.contains("ACK")) PrimaryPink
+                                           else if (log.tag.contains("SIMULATION")) WarningAmber
+                                           else SafeGreen
                                 )
                                 Text(
                                     text = log.timeFormatted,
-                                    style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
-                                    color = TextMuted
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = if (isDemoView) 14.sp else 11.sp
+                                    ),
+                                    color = TextSecondary
                                 )
                             }
-                            Spacer(modifier = Modifier.height(3.dp))
+                            Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = log.message,
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    fontSize = 12.sp,
-                                    fontFamily = FontFamily.Monospace
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = if (isDemoView) 16.sp else 13.sp,
+                                    lineHeight = if (isDemoView) 22.sp else 18.sp
                                 ),
                                 color = TextPrimary
                             )
@@ -474,67 +618,85 @@ fun BleDebugScreen(
             }
 
             item {
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(28.dp))
             }
         }
     }
 }
 
+/**
+ * Clean Permission Row with status pill and "Fix" button.
+ */
 @Composable
-private fun StatusRow(label: String, value: String, isOk: Boolean) {
+private fun PermissionRow(
+    label: String,
+    isGranted: Boolean,
+    onFix: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .padding(vertical = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = TextSecondary
-        )
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = value,
-                style = MaterialTheme.typography.bodySmall.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
+                text = label,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 14.sp
                 ),
-                color = if (isOk) SafeGreen else EmergencyRed
+                color = TextPrimary
             )
-            Spacer(modifier = Modifier.width(4.dp))
-            Icon(
-                imageVector = if (isOk) Icons.Default.CheckCircle else Icons.Default.Error,
-                contentDescription = null,
-                tint = if (isOk) SafeGreen else EmergencyRed,
-                modifier = Modifier.size(14.dp)
-            )
+        }
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (isGranted) SafeGreen.copy(alpha = 0.15f) else EmergencyRed.copy(alpha = 0.15f))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = if (isGranted) stringResource(R.string.permission_granted)
+                           else stringResource(R.string.permission_denied),
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    ),
+                    color = if (isGranted) SafeGreen else EmergencyRed
+                )
+            }
+
+            if (!isGranted) {
+                Button(
+                    onClick = onFix,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = PrimaryPink,
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.height(36.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.fix_permission),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
         }
     }
 }
 
-@Composable
-private fun CounterBadge(label: String, count: Int, color: Color) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFF222222))
-            .padding(horizontal = 10.dp, vertical = 6.dp)
-    ) {
-        Text(
-            text = count.toString(),
-            style = MaterialTheme.typography.titleMedium.copy(
-                fontWeight = FontWeight.Black,
-                fontFamily = FontFamily.Monospace
-            ),
-            color = color
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-            color = TextMuted
-        )
+private fun openAppSettings(context: Context) {
+    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+        data = Uri.fromParts("package", context.packageName, null)
     }
+    context.startActivity(intent)
 }

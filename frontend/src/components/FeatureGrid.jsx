@@ -1,5 +1,5 @@
 import React from 'react'
-import { AlertCircle, MapPin, Radio, Users, Calculator, ShieldCheck, ArrowRight, Mic, Activity, Volume2 } from 'lucide-react'
+import { AlertCircle, MapPin, Radio, Users, Calculator, ShieldCheck, ArrowRight } from 'lucide-react'
 
 export default function FeatureGrid({ onSelectFeature }) {
   const coreFeatures = [
@@ -7,37 +7,37 @@ export default function FeatureGrid({ onSelectFeature }) {
       id: 'emergency',
       title: 'Emergency',
       subtitle: 'Quick help when you need it most.',
-      description: '1-Tap hero button or 3 rapid shakes (> 2.7g) triggers 5-second countdown with immediate audio/vibration feedback.',
+      description: '1-Tap centered SOS button or 3 rapid accelerometer shakes (>2.7g) triggers a 3-second countdown with haptic feedback.',
       icon: AlertCircle,
       badge: 'Multi-Trigger',
-      color: 'from-[#FF2D78] to-[#E91E63]'
+      iconBg: 'bg-status-danger text-white'
     },
     {
       id: 'detection',
       title: 'Detection',
-      subtitle: 'Capture & share location and evidence.',
-      description: 'Captures fresh device GPS coordinates and starts background audio recording to secure app-private storage.',
+      subtitle: 'Capture location & evidence offline.',
+      description: 'Locks GPS coordinates without internet and records microphone evidence directly to protected app-private storage.',
       icon: MapPin,
       badge: 'Offline GPS + Mic',
-      color: 'from-[#E91E63] to-[#C2185B]'
+      iconBg: 'bg-pink-primary text-white'
     },
     {
       id: 'broadcast',
       title: 'Broadcast',
       subtitle: 'Live alert to nearby phones offline.',
-      description: 'Encodes 15-byte binary packet under 16-bit Service UUID (0xFDE1) and broadcasts over Bluetooth Low Energy for 60 seconds.',
+      description: 'Encodes 17-byte binary packet under Service UUID 0xFDE1 and broadcasts over BLE mesh with multi-hop flood routing.',
       icon: Radio,
-      badge: 'Peer-to-Peer BLE',
-      color: 'from-[#FF4B8B] to-[#FF2D78]'
+      badge: 'Flooding BLE Mesh',
+      iconBg: 'bg-status-guardian text-white'
     },
     {
       id: 'community',
       title: 'Community',
-      subtitle: 'Join a safer, stronger network.',
-      description: 'Nearby phones receive high-priority heads-up alarms even screen-off, with estimated proximity (<3m, 3-10m, >10m) and 2-way ACK.',
+      subtitle: 'Autonomous guardian responder network.',
+      description: 'Bystander phones receive heads-up alarms even screen-off, with estimated distance (<3m, 3-10m) and 2-way ACK return.',
       icon: Users,
-      badge: '2-Way ACK Broadcast',
-      color: 'from-[#D81B60] to-[#AD1457]'
+      badge: '2-Way Responder ACK',
+      iconBg: 'bg-status-safe text-white'
     }
   ]
 
@@ -46,17 +46,17 @@ export default function FeatureGrid({ onSelectFeature }) {
       id: 'decoy',
       title: 'Decoy Calculator Disguise',
       subtitle: 'Hidden in Plain Sight',
-      description: 'A fully working arithmetic calculator that covertly triggers SOS when entering secret PIN followed by = or unlocks real guardian UI on long-press =.',
+      description: 'A fully working arithmetic calculator in neutral dark gray. Entering secret PIN followed by = triggers silent SOS without tipping off an attacker.',
       icon: Calculator,
-      tag: 'Anti-Tamper'
+      tag: 'Neutral Disguise'
     },
     {
       id: 'safezones',
-      title: 'Offline Safe Zones & Help Desks',
+      title: 'Offline Tactical Radar & Safe Havens',
       subtitle: 'Verified Safety Havens',
-      description: 'Pre-cached offline directory of 24x7 Women Police Desks, CISF Metro Security Booths, and Trauma Centers with 1-tap emergency dialers.',
+      description: 'Pre-cached directory with concentric radar rings (500m, 1km, 2km, 5km) for 24x7 Women Police Desks and Trauma Centers with 1-tap call.',
       icon: ShieldCheck,
-      tag: 'Offline Directory'
+      tag: 'Offline Radar'
     }
   ]
 
@@ -66,53 +66,52 @@ export default function FeatureGrid({ onSelectFeature }) {
       {/* Section Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-2xl font-black text-[#2D1522] tracking-tight">
+          <h3 className="text-2xl lg:text-3xl font-extrabold text-ink-primary tracking-tight">
             How Nari-Suraksha Protects You
           </h3>
-          <p className="text-xs sm:text-sm font-medium text-gray-600">
-            A comprehensive 4-stage offline safety cycle built into every device.
+          <p className="text-sm font-medium text-ink-secondary mt-1">
+            A stress-proof 4-stage safety cycle engineered directly into every device.
           </p>
         </div>
-        <span className="hidden sm:inline-flex text-xs font-bold text-[#FF2D78] bg-pink-100 px-3 py-1 rounded-full border border-pink-200">
-          Core Workstreams
+        <span className="hidden sm:inline-flex text-xs font-bold text-pink-primary bg-pink-soft px-3 py-1 rounded-full border border-pink-border">
+          4-Stage Protection Cycle
         </span>
       </div>
 
-      {/* 4 Core Cards from Screenshot */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* 4 Core Cards with Solid Colors & 24px Card Radius */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {coreFeatures.map((f) => {
           const Icon = f.icon
           return (
             <div
               key={f.id}
               onClick={() => onSelectFeature && onSelectFeature(f.id)}
-              className="group bg-white rounded-3xl p-5 border border-[#FFE1EC] hover:border-pink-300 shadow-soft-pink hover:shadow-glow-pink transition-all duration-300 flex flex-col justify-between cursor-pointer hover:-translate-y-1"
+              className="bg-white rounded-card p-6 border-2 border-pink-border hover:border-pink-primary shadow-flat-card hover:shadow-flat-elevated transition-all flex flex-col justify-between cursor-pointer"
             >
               <div>
-                {/* Icon Circle matching Screenshot */}
                 <div className="flex items-center justify-between mb-4">
-                  <div className={`w-12 h-12 rounded-2xl bg-gradient-to-tr ${f.color} flex items-center justify-center text-white shadow-md shadow-pink-500/20 group-hover:scale-110 transition-transform`}>
+                  <div className={`w-12 h-12 rounded-2xl ${f.iconBg} flex items-center justify-center shadow-sm`}>
                     <Icon className="w-6 h-6 stroke-[2.2]" />
                   </div>
-                  <span className="text-[10px] font-extrabold text-[#E91E63] bg-pink-50 px-2 py-0.5 rounded-full border border-pink-100">
+                  <span className="text-[10px] font-extrabold text-pink-primary bg-pink-soft px-2.5 py-0.5 rounded-full border border-pink-border">
                     {f.badge}
                   </span>
                 </div>
 
-                <h4 className="text-lg font-extrabold text-[#2D1522] group-hover:text-[#FF2D78] transition-colors">
+                <h4 className="text-xl font-extrabold text-ink-primary">
                   {f.title}
                 </h4>
-                <p className="text-xs font-bold text-pink-700/80 mt-0.5">
+                <p className="text-xs font-bold text-pink-primary mt-1">
                   {f.subtitle}
                 </p>
-                <p className="text-xs text-gray-600 font-medium mt-2 leading-relaxed">
+                <p className="text-xs text-ink-secondary font-medium mt-2 leading-relaxed">
                   {f.description}
                 </p>
               </div>
 
-              <div className="mt-4 pt-3 border-t border-pink-50 flex items-center justify-between text-[#FF2D78]">
-                <span className="text-xs font-bold group-hover:underline">Explore Flow</span>
-                <div className="w-7 h-7 rounded-full bg-pink-50 flex items-center justify-center group-hover:bg-[#FF2D78] group-hover:text-white transition-colors">
+              <div className="mt-5 pt-3 border-t border-pink-border flex items-center justify-between text-pink-primary">
+                <span className="text-xs font-bold">Inspect Simulation</span>
+                <div className="w-7 h-7 rounded-full bg-pink-soft flex items-center justify-center text-pink-primary">
                   <ArrowRight className="w-3.5 h-3.5" />
                 </div>
               </div>
@@ -121,33 +120,33 @@ export default function FeatureGrid({ onSelectFeature }) {
         })}
       </div>
 
-      {/* Extra Innovation Features */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+      {/* 2 Extra Features */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-1">
         {extraFeatures.map((f) => {
           const Icon = f.icon
           return (
             <div
               key={f.id}
               onClick={() => onSelectFeature && onSelectFeature(f.id)}
-              className="bg-gradient-to-r from-white to-[#FFF5F8] rounded-3xl p-5 border border-pink-200 hover:border-pink-300 shadow-sm flex items-center gap-4 cursor-pointer hover:shadow-soft-pink transition-all"
+              className="bg-white rounded-card p-6 border-2 border-pink-border hover:border-pink-primary shadow-flat-card flex items-center gap-5 cursor-pointer transition-all"
             >
-              <div className="w-14 h-14 rounded-2xl bg-[#FFE4EE] text-[#FF2D78] flex-shrink-0 flex items-center justify-center shadow-inner">
+              <div className="w-14 h-14 rounded-2xl bg-pink-soft text-pink-primary flex-shrink-0 flex items-center justify-center border border-pink-border">
                 <Icon className="w-7 h-7 stroke-[2]" />
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <h4 className="text-base font-extrabold text-[#2D1522]">
+                  <h4 className="text-base font-extrabold text-ink-primary">
                     {f.title}
                   </h4>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-pink-100 text-[#E91E63]">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-pink-soft text-pink-primary border border-pink-border">
                     {f.tag}
                   </span>
                 </div>
-                <p className="text-xs text-gray-600 font-medium mt-1">
+                <p className="text-xs text-ink-secondary font-medium mt-1 leading-relaxed">
                   {f.description}
                 </p>
               </div>
-              <ArrowRight className="w-5 h-5 text-pink-400 group-hover:text-pink-600" />
+              <ArrowRight className="w-5 h-5 text-pink-primary" />
             </div>
           )
         })}

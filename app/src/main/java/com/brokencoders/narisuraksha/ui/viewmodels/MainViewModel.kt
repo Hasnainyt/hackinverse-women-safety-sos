@@ -321,6 +321,26 @@ class MainViewModel(
         bleScanner.restartScanning()
     }
 
+    /**
+     * Injects a simulated SOS packet into the UI and BLE diagnostics for emulator/demo validation.
+     * Safe for debug environments where a second physical transmitter is unavailable.
+     */
+    fun injectSimulatedSosForTesting(
+        senderId: Short = 999,
+        lat: Float = 28.6139f,
+        lon: Float = 77.2090f,
+        rssi: Int = -62
+    ) {
+        val packet = SosPacket.create(
+            senderId = senderId,
+            lat = lat.toDouble(),
+            lon = lon.toDouble()
+        )
+        _latestReceivedAlert.value = ReceivedSos(packet = packet, rssi = rssi, receivedAt = System.currentTimeMillis())
+        bleDiagnostics.recordEvent("SIMULATION", "Injected simulated SOS beacon from sender #$senderId (RSSI: $rssi dBm)")
+        bleDiagnostics.incrementPacketsReceived()
+    }
+
     // ==========================================
     // Emergency Contacts Management
     // ==========================================

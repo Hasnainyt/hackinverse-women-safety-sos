@@ -7,29 +7,40 @@ export default {
   theme: {
     extend: {
       colors: {
-        brand: {
-          50: '#FFF5F8',
-          100: '#FFE4EE',
-          200: '#FFCCD $\\rightarrow$ #FFC0D9',
-          300: '#FF94BC',
-          400: '#FF5C99',
-          500: '#FF2D78',
-          600: '#E91E63',
-          700: '#C2185B',
-          800: '#880E4F',
-          900: '#4A0829',
+        pink: {
+          primary: '#C2185B',
+          pressed: '#A0144A',
+          soft: '#FCE4EC',
+          border: '#F2C9D8',
+          lightened: '#F06292',
         },
-        surface: {
-          light: '#FFF9FB',
+        bg: {
+          app: '#FFF7FA',
           card: '#FFFFFF',
-          soft: '#FDF2F6',
-          border: '#FFE1EC',
-          dark: '#1A1118'
+          plum: '#1E1218',
+          plumSurface: '#2A1A22',
+        },
+        ink: {
+          primary: '#2B1B22',
+          secondary: '#6B5560',
+          border: '#F2C9D8',
+        },
+        status: {
+          danger: '#D32F2F', // ONLY for active SOS or danger
+          safe: '#2E7D32',   // ACK received, confirmations, healthy mesh
+          guardian: '#1565C0', // Info, responder / relay role
+          amber: '#B26A00',   // Warning, cooldown, low budget
         }
       },
+      borderRadius: {
+        'card': '24px',
+        'btn': '20px',
+        'chip': '9999px',
+      },
       boxShadow: {
-        'soft-pink': '0 10px 30px -5px rgba(233, 30, 99, 0.12)',
-        'glow-pink': '0 0 25px 2px rgba(255, 45, 120, 0.35)',
+        'flat-card': '0 2px 8px rgba(43, 27, 34, 0.06)',
+        'flat-elevated': '0 4px 16px rgba(43, 27, 34, 0.08)',
+        'pink-action': '0 4px 14px rgba(194, 24, 91, 0.25)',
       }
     },
   },

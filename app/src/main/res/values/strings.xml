@@ -1,11 +1,122 @@
 <resources>
     <string name="app_name">Calculator</string>
     <string name="real_app_name">Nari Suraksha</string>
-    <string name="app_tagline">Works without cellular or internet connectivity.</string>
+    <string name="app_tagline">Network gayab, fir bhi help alive.</string>
+    <string name="home_tagline">Network gayab, fir bhi help alive.</string>
     <string name="sos_broadcast_title">SOS Beacon Active</string>
     <string name="sos_broadcast_desc">Broadcasting distress signal peer-to-peer over BLE</string>
     <string name="scan_service_title">Calculator Service</string>
     <string name="scan_service_desc">Background process active</string>
     <string name="alert_notification_title">🚨 Emergency Alert Nearby</string>
     <string name="alert_notification_desc">A distress beacon was detected nearby.</string>
+
+    <!-- Design System Copy: Stress-Proof, Plain-Language -->
+    <string name="hold_for_help">Hold for help</string>
+    <string name="cancel_sos">Cancel SOS</string>
+    <string name="broadcasting_sos">Broadcasting SOS</string>
+    <string name="help_alerted_stay_calm">Help is being alerted. Stay calm.</string>
+    <string name="nearby_phones_passing_alert">Nearby phones are passing your alert along.</string>
+    <string name="im_safe">I\'m safe</string>
+    <string name="stop_broadcast">I\'m safe (Stop broadcast)</string>
+    <string name="zero_responders">0 people responding</string>
+    <string name="single_responder">1 person responding</string>
+    <string name="multiple_responders">%1$d people responding</string>
+    <string name="responder_acknowledged">A nearby phone acknowledged your signal.</string>
+    <string name="broadcasting_mesh_desc">Transmitting distress beacon over BLE mesh.</string>
+    <string name="call_primary_contact">Call primary contact</string>
+    <string name="call_contact">Call %1$s</string>
+    <string name="set_primary_contact">Set emergency contact</string>
+    <string name="bluetooth_status">Bluetooth</string>
+    <string name="location_status">Location</string>
+    <string name="mesh_relay_on">Mesh relay: On</string>
+    <string name="mesh_relay_off">Mesh relay: Off</string>
+    <string name="offline_badge">OFFLINE MESH</string>
+    <string name="emergency_deterrents">Emergency Deterrents</string>
+    <string name="stop_siren">Stop Siren</string>
+    <string name="loud_siren">Loud Siren</string>
+    <string name="torch_off">Torch Off</string>
+    <string name="strobe_torch">Strobe Torch</string>
+    <string name="protection_settings">Offline Protection Settings</string>
+    <string name="shake_detection_title">Shake to Trigger SOS</string>
+    <string name="shake_detection_subtitle">3 rapid shakes starts countdown</string>
+    <string name="guardian_scan_title">Background BLE Guardian</string>
+    <string name="guardian_scan_subtitle">Listens for distress alerts in background</string>
+    <string name="decoy_calculator_title">Decoy Calculator Mode</string>
+    <string name="decoy_calculator_subtitle">Disguises app as calculator with PIN trigger</string>
+    <string name="nearby_distress_title">Nearby Distress Signal</string>
+    <string name="nearby_distress_subtitle">Tap to view estimated distance &amp; responder tools</string>
+    <string name="cellular_backup">CELLULAR BACKUP</string>
+
+    <!-- Alert / Responder Screen -->
+    <string name="alert_screen_title">Distress Signal Detected</string>
+    <string name="emergency_sos_active">EMERGENCY SOS ACTIVE</string>
+    <string name="sender_anonymous_id">Sender Anonymous ID: #%1$d</string>
+    <string name="estimated_proximity">Estimated Proximity</string>
+    <string name="distance_within_3m">Within 3 m</string>
+    <string name="distance_3_to_10m">Within 3 – 10 m</string>
+    <string name="distance_over_10m">&gt; 10 m away</string>
+    <string name="i_am_responding">I AM RESPONDING</string>
+    <string name="ack_transmitted">ACK Transmitted to Sender</string>
+    <string name="dismiss">Dismiss</string>
+    <string name="direct_mesh_signal">Direct BLE Signal</string>
+    <string name="passed_along_hops">Passed along %1$d hops</string>
+    <string name="gps_coordinates">GPS Coordinates (Offline)</string>
+    <string name="open_maps">Open Maps</string>
+    <string name="copy">Copy</string>
+    <string name="coordinates_copied">Coordinates copied to clipboard</string>
+    <string name="no_gps_indoors">Sender\'s GPS was unavailable indoors. Track via Bluetooth proximity and signal strength.</string>
+    <string name="responder_tools">Responder Assistance Tools</string>
+    <string name="ack_success_toast">ACK beacon transmitted! Sender notified.</string>
+
+    <!-- Mesh Diagnostics & BleDebugScreen -->
+    <string name="mesh_diagnostics_title">Mesh Status &amp; Diagnostics</string>
+    <string name="demo_view_title">Demo View (Projector Mode)</string>
+    <string name="demo_view_subtitle">Enlarges telemetry counters and live logcat for projector</string>
+    <string name="packets_sent">Packets Sent</string>
+    <string name="packets_recv">Packets Recv</string>
+    <string name="acks_sent">ACKs Sent</string>
+    <string name="acks_recv">ACKs Recv</string>
+    <string name="relays_sched">Relays Sched</string>
+    <string name="dup_dropped">Dup Dropped</string>
+    <string name="last_ttl">Last TTL</string>
+    <string name="cooldown_drops">Cooldown Drops</string>
+    <string name="send_test_beacon">Send test beacon (10s)</string>
+    <string name="stop_test_beacon">Stop test beacon</string>
+    <string name="inject_simulation">Inject simulated SOS (emulator test)</string>
+    <string name="simulation_tag">SIMULATION</string>
+    <string name="restart_scanner">Restart Scanner</string>
+    <string name="clear_logs">Clear Logs</string>
+    <string name="hardware_capabilities">RADIO CAPABILITIES</string>
+    <string name="runtime_permissions">RUNTIME PERMISSIONS</string>
+    <string name="fix_permission">Fix</string>
+    <string name="permission_granted">Granted</string>
+    <string name="permission_denied">Denied</string>
+    <string name="live_logs_title">LIVE BLE LOGCAT EVENTS (%1$d)</string>
+    <string name="no_logs">No BLE events recorded yet. Transmit a test beacon or restart scanner.</string>
+
+    <!-- Map & Safe Zones -->
+    <string name="tactical_radar_title">Tactical Radar &amp; Map</string>
+    <string name="offline_radar_title">Offline Proximity Radar (5 km)</string>
+    <string name="nearest_safe_zones">Nearest Safe Havens</string>
+    <string name="live_gps_telemetry">Live GPS Telemetry</string>
+    <string name="offline_baseline_gps">Offline Baseline Location</string>
+    <string name="ring_500m">500 m</string>
+    <string name="ring_1km">1 km</string>
+    <string name="ring_2km">2 km</string>
+    <string name="ring_5km">5 km</string>
+
+    <!-- Emergency Contacts -->
+    <string name="emergency_contacts_title">Emergency Contacts</string>
+    <string name="trusted_circle_title">Trusted Emergency Circle</string>
+    <string name="trusted_circle_subtitle">Stored securely on device. Cellular call and SMS backup when offline BLE is triggered.</string>
+    <string name="no_contacts_title">No emergency contacts yet</string>
+    <string name="no_contacts_subtitle">Add family, guardians, or trusted friends who will be alerted immediately during an emergency.</string>
+    <string name="add_first_contact">Add First Contact</string>
+    <string name="add_contact">Add Contact</string>
+    <string name="edit_contact">Edit Contact</string>
+    <string name="primary_contact_star">Primary Contact</string>
+    <string name="call_now">Call Now</string>
+    <string name="send_sms_btn">Send SMS</string>
+    <string name="delete_contact_confirm_title">Delete Contact?</string>
+    <string name="delete_contact_confirm_message">Are you sure you want to remove %1$s from your trusted emergency circle?</string>
 </resources>

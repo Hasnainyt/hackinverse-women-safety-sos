@@ -7,7 +7,7 @@ import OfflineArchitecture from './components/OfflineArchitecture'
 import SafeZonesExplorer from './components/SafeZonesExplorer'
 import DownloadSection from './components/DownloadSection'
 import BottomBar from './components/BottomBar'
-import { Shield, Heart, Radio, Github, ExternalLink } from 'lucide-react'
+import { Shield, Heart, Github, ExternalLink } from 'lucide-react'
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('home')
@@ -21,7 +21,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FFF5F8] text-[#2D1522] flex flex-col justify-between pb-20">
+    <div className="min-h-screen bg-bg-app text-ink-primary flex flex-col justify-between pb-24">
       
       {/* Top Header */}
       <Header activeTab={activeTab} setActiveTab={scrollToSection} />
@@ -29,12 +29,17 @@ export default function App() {
       {/* Main Content Container */}
       <main className="max-w-7xl mx-auto px-4 lg:px-8 py-8 space-y-12">
         
-        {/* Hero Banner (Matching Image 1 & 2) */}
+        {/* Hero Banner */}
         <div id="home">
           <HeroBanner onOpenSimulator={() => scrollToSection('simulator')} />
         </div>
 
-        {/* 4 Core Features from Screenshot */}
+        {/* 3-Phone BLE Mesh Simulator (Visual Centerpiece) */}
+        <div id="simulator">
+          <InteractiveSimulator />
+        </div>
+
+        {/* 4 Core Features Flow */}
         <div id="features">
           <FeatureGrid onSelectFeature={(featId) => {
             if (featId === 'decoy' || featId === 'emergency' || featId === 'broadcast') {
@@ -43,11 +48,6 @@ export default function App() {
               scrollToSection('safezones')
             }
           }} />
-        </div>
-
-        {/* Live Interactive 2-Phone BLE Simulator */}
-        <div id="simulator">
-          <InteractiveSimulator />
         </div>
 
         {/* 100% Offline BLE Architecture */}
@@ -66,25 +66,25 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="bg-white border-t border-[#FFE1EC] py-8 px-4 lg:px-8 mt-12 text-center text-xs font-medium text-gray-600">
+      <footer className="bg-white border-t border-pink-border py-8 px-4 lg:px-8 mt-12 text-center text-xs font-medium text-ink-secondary">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg bg-[#FF2D78] flex items-center justify-center text-white">
+            <div className="w-6 h-6 rounded-lg bg-pink-primary flex items-center justify-center text-white">
               <Shield className="w-3.5 h-3.5" />
             </div>
-            <span className="font-extrabold text-[#2D1522]">Nari-Suraksha</span>
-            <span className="text-gray-400">• Hackinverse 1.0</span>
+            <span className="font-extrabold text-ink-primary">Nari-Suraksha</span>
+            <span className="text-ink-secondary">• Hackinverse 1.0</span>
           </div>
 
           <p className="flex items-center gap-1">
-            Made with <Heart className="w-3.5 h-3.5 text-[#FF2D78] fill-pink-500 inline" /> by <strong>Team Broken Coders</strong>
+            Engineered with <Heart className="w-3.5 h-3.5 text-pink-primary fill-pink-primary inline" /> by <strong>Team Broken Coders</strong>
           </p>
 
           <a
             href="https://github.com/Hasnainyt/hackinverse-women-safety"
             target="_blank"
             rel="noreferrer"
-            className="flex items-center gap-1.5 text-gray-700 hover:text-[#FF2D78] font-bold"
+            className="flex items-center gap-1.5 text-ink-primary hover:text-pink-primary font-bold"
           >
             <Github className="w-4 h-4" />
             <span>GitHub Repository</span>
@@ -93,7 +93,7 @@ export default function App() {
         </div>
       </footer>
 
-      {/* Floating Bottom Action Bar from Screenshot */}
+      {/* Persistent Bottom Bar */}
       <BottomBar onTriggerQuickDemo={() => scrollToSection('simulator')} />
 
     </div>
