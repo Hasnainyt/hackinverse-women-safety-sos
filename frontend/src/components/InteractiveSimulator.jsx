@@ -1,112 +1,130 @@
 import React, { useState, useEffect } from 'react'
-import { AlertCircle, Radio, Shield, CheckCircle, Volume2, Flashlight, Calculator, RefreshCw, Smartphone, MapPin, Signal, ArrowRight, XCircle } from 'lucide-react'
+import {
+  AlertCircle,
+  Radio,
+  Shield,
+  CheckCircle,
+  Volume2,
+  Flashlight,
+  RefreshCw,
+  Smartphone,
+  MapPin,
+  Signal,
+  ArrowRight,
+  ArrowLeft,
+  XCircle,
+  WifiOff,
+  Navigation,
+  Activity,
+  Calculator
+} from 'lucide-react'
+import { useI18n } from '../i18n'
 
 export default function InteractiveSimulator() {
-  const [activeMode, setActiveMode] = useState('sos') // 'sos' | 'decoy'
-  
-  // Phone A (Distress Sender) State
-  const [sosState, setSosState] = useState('idle') // 'idle' | 'countdown' | 'broadcasting'
+  const i18n = useI18n()
+  const t = i18n.simulator
+
+  // Mode on Phone A: 'sos' | 'decoy'
+  const [activeMode, setActiveMode] = useState('sos')
+
+  // Simulation State
+  // 'idle' | 'countdown' | 'hop1_sending' | 'hop1_reached' | 'hop2_sending' | 'hop2_reached' | 'ack_sending' | 'ack_delivered'
+  const [stage, setStage] = useState('idle')
   const [countdown, setCountdown] = useState(3)
+  
+  // Relay B Configuration
+  const [isRelayEnabled, setIsRelayEnabled] = useState(true)
+
+  // Phone A state
   const [responderCount, setResponderCount] = useState(0)
 
-  // Phone B (Intermediate Mesh Relay) State
-  const [phoneBAlert, setPhoneBAlert] = useState(null)
-  const [isRelayEnabled, setIsRelayEnabled] = useState(true)
-  const [isPhoneBRelaying, setIsPhoneBRelaying] = useState(false)
-
-  // Phone C (Distant Responder - Out of Direct Range of A) State
-  const [phoneCAlert, setPhoneCAlert] = useState(null)
-  const [isPhoneCAckSent, setIsPhoneCAckSent] = useState(false)
-  const [isPhoneCSirenOn, setIsPhoneCSirenOn] = useState(false)
-  const [isPhoneCTorchOn, setIsPhoneCTorchOn] = useState(false)
+  // Phone C state
+  const [isAckSent, setIsAckSent] = useState(false)
+  const [isSirenOn, setIsSirenOn] = useState(false)
+  const [isTorchOn, setIsTorchOn] = useState(false)
 
   // Decoy Calculator State
   const [calcDisplay, setCalcDisplay] = useState('0')
   const [calcInputHistory, setCalcInputHistory] = useState('')
   const [secretPin, setSecretPin] = useState('1234')
 
-  // Countdown timer logic for Phone A
+  // Countdown timer for Phone A
   useEffect(() => {
     let timer
-    if (sosState === 'countdown') {
+    if (stage === 'countdown') {
       if (countdown > 0) {
-        timer = setTimeout(() => setCountdown((prev) => prev - 1), 1000)
+        timer = setTimeout(() => setCountdown((c) => c - 1), 1000)
       } else {
-        setSosState('broadcasting')
-        
-        // Hop 1: Phone A -> Phone B (Direct BLE radio in range, TTL 4)
-        setTimeout(() => {
-          setPhoneBAlert({
-            senderId: '#7842',
-            timestamp: new Date().toLocaleTimeString(),
-            lat: 28.6139,
-            lon: 77.2090,
-            rssi: -58,
-            ttl: 4,
-            distanceText: 'Approx. < 3 meters away',
-            category: 'VERY CLOSE'
-          })
-
-          // Hop 2: If Relay is enabled on B, B forwards to C with TTL 3
-          if (isRelayEnabled) {
-            setIsPhoneBRelaying(true)
-            setTimeout(() => {
-              setPhoneCAlert({
-                senderId: '#7842',
-                timestamp: new Date().toLocaleTimeString(),
-                lat: 28.6139,
-                lon: 77.2090,
-                rssi: -79,
-                ttl: 3, // Hop count: 1 (decremented TTL)
-                relayedBy: '#B-RELAY',
-                distanceText: 'Relayed via Phone B (Multi-Hop)',
-                category: 'RELAYED'
-              })
-              setIsPhoneBRelaying(false)
-            }, 1200)
-          }
-        }, 1000)
+        // Countdown finished, begin Hop 1 broadcast from Phone A to Phone B
+        setStage('hop1_sending')
       }
     }
     return () => clearTimeout(timer)
-  }, [sosState, countdown, isRelayEnabled])
+  }, [stage, countdown])
 
-  const handleTriggerSos = () => {
-    setSosState('countdown')
+  // Packet animation pipeline
+  useEffect(() => {
+    let timer
+    if (stage === 'hop1_sending') {
+      // Packet travels from Phone A -> Phone B (1.2s)
+      timer = setTimeout(() => {
+        setStage('hop1_reached')
+      }, 1200)
+    } else if (stage === 'hop1_reached') {
+      if (isRelayEnabled) {
+        // Relay B re-broadcasts packet to Phone C
+        timer = setTimeout(() => {
+          setStage('hop2_sending')
+        }, 900)
+      } else {
+        // Relay B is disabled: packet is dropped at B, cannot reach C!
+        // Stays in 'hop1_reached' with dropped message
+      }
+    } else if (stage === 'hop2_sending') {
+      // Packet travels from Phone B -> Phone C (1.2s)
+      timer = setTimeout(() => {
+        setStage('hop2_reached')
+      }, 1200)
+    } else if (stage === 'ack_sending') {
+      // ACK travels backwards: C -> B -> A (1.4s)
+      timer = setTimeout(() => {
+        setStage('ack_delivered')
+        setResponderCount(1)
+      }, 1400)
+    }
+    return () => clearTimeout(timer)
+  }, [stage, isRelayEnabled])
+
+  const handleStartSos = () => {
     setCountdown(3)
+    setStage('countdown')
     setResponderCount(0)
-    setPhoneBAlert(null)
-    setPhoneCAlert(null)
-    setIsPhoneCAckSent(false)
+    setIsAckSent(false)
+    setIsSirenOn(false)
+    setIsTorchOn(false)
   }
 
-  const handleCancelCountdown = () => {
-    setSosState('idle')
-    setCountdown(3)
-  }
-
-  const handleResetSimulator = () => {
-    setSosState('idle')
+  const handleCancel = () => {
+    setStage('idle')
     setCountdown(3)
     setResponderCount(0)
-    setPhoneBAlert(null)
-    setPhoneCAlert(null)
-    setIsPhoneCAckSent(false)
-    setIsPhoneBRelaying(false)
-    setIsPhoneCSirenOn(false)
-    setIsPhoneCTorchOn(false)
+    setIsAckSent(false)
+  }
+
+  const handleReset = () => {
+    setStage('idle')
+    setCountdown(3)
+    setResponderCount(0)
+    setIsAckSent(false)
+    setIsSirenOn(false)
+    setIsTorchOn(false)
     setCalcDisplay('0')
     setCalcInputHistory('')
   }
 
-  const handlePhoneCSendAck = () => {
-    setIsPhoneCAckSent(true)
-    if (isRelayEnabled) {
-      // ACK travels C -> B -> A
-      setTimeout(() => {
-        setResponderCount((prev) => prev + 1)
-      }, 800)
-    }
+  const handleSendAck = () => {
+    setIsAckSent(true)
+    setStage('ack_sending')
   }
 
   // Calculator interaction
@@ -119,7 +137,7 @@ export default function InteractiveSimulator() {
     if (val === '=') {
       if (calcDisplay === secretPin || calcInputHistory.endsWith(secretPin)) {
         setActiveMode('sos')
-        handleTriggerSos()
+        handleStartSos()
         return
       }
       try {
@@ -143,301 +161,569 @@ export default function InteractiveSimulator() {
     }
   }
 
+  const isBroadcasting = ['hop1_sending', 'hop1_reached', 'hop2_sending', 'hop2_reached', 'ack_sending', 'ack_delivered'].includes(stage)
+  const isPacketAtB = ['hop1_reached', 'hop2_sending', 'hop2_reached', 'ack_sending', 'ack_delivered'].includes(stage)
+  const isPacketAtC = ['hop2_reached', 'ack_sending', 'ack_delivered'].includes(stage)
+
   return (
-    <section className="bg-white rounded-3xl p-6 lg:p-8 border border-pink-200 shadow-soft-pink space-y-6">
+    <section className="bg-white rounded-card p-6 lg:p-10 border-2 border-pink-border shadow-flat-card space-y-8">
       
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-pink-100">
+      {/* Centerpiece Header with Projector-Ready Type */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-pink-border">
         <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#FF2D78] animate-pulse" />
-            <h3 className="text-2xl font-black text-[#2D1522]">
-              Interactive 3-Phone BLE Mesh Simulation
-            </h3>
-            <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
-              Multi-Hop Flooding Mesh Verified
-            </span>
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-pink-soft text-pink-primary border border-pink-border text-xs font-bold uppercase tracking-wider mb-2">
+            <Radio className="w-3.5 h-3.5" />
+            <span>{t.badge}</span>
           </div>
-          <p className="text-xs sm:text-sm text-gray-600 font-medium mt-1">
-            Simulate 3-node multi-hop propagation: Phone A (Victim) reaches Phone C (Responder) via Phone B (Relay) even when A and C are out of direct radio range.
+          <h2 className="text-3xl lg:text-4xl font-extrabold text-ink-primary tracking-tight">
+            {t.title}
+          </h2>
+          <p className="text-base text-ink-secondary font-medium mt-1.5 max-w-2xl leading-relaxed">
+            {t.subtitle}
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="flex bg-pink-50 p-1 rounded-xl border border-pink-200">
-            <button
-              onClick={() => setActiveMode('sos')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                activeMode === 'sos' ? 'bg-[#FF2D78] text-white shadow-sm' : 'text-gray-600 hover:text-pink-600'
-              }`}
-            >
-              Standard SOS Mode
-            </button>
-            <button
-              onClick={() => setActiveMode('decoy')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                activeMode === 'decoy' ? 'bg-[#FF2D78] text-white shadow-sm' : 'text-gray-600 hover:text-pink-600'
-              }`}
-            >
-              Decoy Calculator Mode
-            </button>
-          </div>
+        {/* Global Simulation Actions */}
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => setIsRelayEnabled(!isRelayEnabled)}
+            className={`px-5 py-3 rounded-btn text-sm font-bold border-2 transition-all flex items-center gap-2 shadow-sm ${
+              isRelayEnabled
+                ? 'bg-white border-pink-primary text-pink-primary hover:bg-pink-soft'
+                : 'bg-status-amber text-white border-status-amber hover:opacity-90'
+            }`}
+          >
+            {isRelayEnabled ? (
+              <>
+                <WifiOff className="w-4 h-4" />
+                <span>{t.disableRelayBtn}</span>
+              </>
+            ) : (
+              <>
+                <Radio className="w-4 h-4" />
+                <span>{t.enableRelayBtn}</span>
+              </>
+            )}
+          </button>
 
           <button
-            onClick={handleResetSimulator}
-            className="p-2 rounded-xl text-gray-500 hover:text-[#FF2D78] hover:bg-pink-50 border border-pink-200 transition-colors"
-            title="Reset Simulator"
+            onClick={handleReset}
+            className="px-4 py-3 rounded-btn text-sm font-bold bg-white border border-pink-border text-ink-secondary hover:text-pink-primary hover:bg-pink-soft transition-all flex items-center gap-1.5"
+            title="Reset Simulation"
           >
             <RefreshCw className="w-4 h-4" />
+            <span>{t.resetBtn}</span>
           </button>
         </div>
       </div>
 
-      {/* Mesh Path Flow Indicator */}
-      <div className="bg-gradient-to-r from-pink-50 via-purple-50 to-emerald-50 rounded-2xl p-3 border border-pink-200 flex flex-wrap items-center justify-between gap-2 text-xs font-bold">
-        <div className="flex items-center gap-2">
-          <span className="px-2 py-0.5 bg-pink-600 text-white rounded-md text-[11px]">Phone A (Victim)</span>
-          <ArrowRight className="w-3.5 h-3.5 text-gray-400" />
-          <span className="px-2 py-0.5 bg-purple-600 text-white rounded-md text-[11px]">Phone B (Relay)</span>
-          <ArrowRight className="w-3.5 h-3.5 text-gray-400" />
-          <span className="px-2 py-0.5 bg-emerald-600 text-white rounded-md text-[11px]">Phone C (Distant Responder)</span>
-        </div>
-        <div className="flex items-center gap-2 text-[11px]">
-          <span className="text-gray-500">Topology:</span>
-          <span className="text-purple-700 font-extrabold">A & C out of range • B bridges the gap</span>
+      {/* Dynamic Simulation State Explanation Banner */}
+      <div className={`p-4 rounded-2xl border-2 transition-all ${
+        !isRelayEnabled && stage === 'hop1_reached'
+          ? 'bg-status-amber/10 border-status-amber text-status-amber'
+          : stage === 'ack_delivered'
+          ? 'bg-status-safe/10 border-status-safe text-status-safe'
+          : isBroadcasting
+          ? 'bg-pink-soft border-pink-primary text-pink-primary'
+          : 'bg-bg-app border-pink-border text-ink-secondary'
+      }`}>
+        <div className="flex items-center gap-3">
+          <div className="w-3 h-3 rounded-full flex-shrink-0 animate-ping bg-current" />
+          <div className="text-sm font-semibold">
+            {!isRelayEnabled && stage === 'hop1_reached' ? (
+              <span><strong>Packet Dropped at Phone B:</strong> {t.relayDisabledNotice}</span>
+            ) : stage === 'ack_delivered' ? (
+              <span><strong>Mesh Full Cycle Complete:</strong> Acknowledgment delivered back to Phone A. Sender knows help is responding!</span>
+            ) : stage === 'ack_sending' ? (
+              <span><strong>Return ACK Flooding:</strong> Phone C's confirmation packet is hopping backwards across Phone B to Phone A...</span>
+            ) : stage === 'hop2_reached' ? (
+              <span><strong>Packet Reached Phone C:</strong> Responder's device alarmed with proximity distance bucket and direction!</span>
+            ) : stage === 'hop2_sending' ? (
+              <span><strong>Hop 2 Re-broadcast:</strong> Phone B forwarded packet with decremented TTL (3 → 2) to Phone C.</span>
+            ) : stage === 'hop1_reached' ? (
+              <span><strong>Phone B Received Packet:</strong> Processing deduplication filter and scheduling immediate relay...</span>
+            ) : stage === 'hop1_sending' ? (
+              <span><strong>Hop 1 Broadcasting:</strong> Phone A transmitting 17-byte BLE advertising payload (UUID 0xFDE1)...</span>
+            ) : stage === 'countdown' ? (
+              <span><strong>SOS Countdown Armed:</strong> 3-second stress buffer. Tap Cancel anytime if triggered accidentally.</span>
+            ) : (
+              <span><strong>Mesh Ready:</strong> Tap the large pink SOS button on Phone A to begin the offline packet broadcast.</span>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* 3-Device Multi-Hop Interactive Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-start">
+      {/* 3-PHONE VISUAL CENTERPIECE */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch relative">
         
-        {/* ================= DEVICE 1 (PHONE A: SENDER) ================= */}
-        <div className="bg-gradient-to-b from-[#FFF5F8] to-white rounded-3xl p-5 border-2 border-pink-200 shadow-md space-y-3.5">
-          <div className="flex items-center justify-between pb-2.5 border-b border-pink-100">
+        {/* ========================================================= */}
+        {/* PHONE A: VICTIM (DISTRESS SENDER) */}
+        {/* ========================================================= */}
+        <div className="flex flex-col bg-bg-app rounded-[32px] p-5 border-2 border-pink-border shadow-flat-card relative">
+          
+          {/* Top Chassis / Notch */}
+          <div className="flex items-center justify-between pb-3 border-b border-pink-border text-xs font-bold text-ink-secondary">
             <div className="flex items-center gap-1.5">
-              <Smartphone className="w-4 h-4 text-[#FF2D78]" />
-              <h4 className="text-xs font-extrabold text-[#2D1522]">Phone A (Victim)</h4>
+              <span className="w-2.5 h-2.5 rounded-full bg-pink-primary" />
+              <span className="text-ink-primary font-black">{t.phoneA.title}</span>
             </div>
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-pink-100 text-[#FF2D78]">
-              TTL: 4 (Origin)
-            </span>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setActiveMode(activeMode === 'sos' ? 'decoy' : 'sos')}
+                className="px-2 py-0.5 rounded-full bg-pink-soft text-pink-primary text-[11px] font-bold hover:bg-pink-soft/80 flex items-center gap-1 transition-all"
+                title="Toggle between SOS Button and Decoy Calculator"
+              >
+                {activeMode === 'sos' ? (
+                  <>
+                    <Calculator className="w-3 h-3" />
+                    <span>Decoy</span>
+                  </>
+                ) : (
+                  <>
+                    <Shield className="w-3 h-3" />
+                    <span>SOS</span>
+                  </>
+                )}
+              </button>
+              <span className="px-2 py-0.5 rounded-full bg-pink-soft text-pink-primary text-[11px] font-bold">
+                {t.phoneA.role}
+              </span>
+            </div>
           </div>
 
+          {/* Screen Content */}
           {activeMode === 'decoy' ? (
-            /* Decoy Calculator Interface */
-            <div className="bg-[#1E1E1E] rounded-2xl p-3.5 text-white shadow-inner max-w-[240px] mx-auto space-y-2">
-              <div className="text-right">
-                <p className="text-[9px] text-gray-400">Calculator Disguise</p>
-                <div className="text-2xl font-light font-mono py-1">{calcDisplay}</div>
+            <div className="flex-1 flex flex-col justify-between py-4 space-y-4">
+              <div className="bg-[#1E1E1E] rounded-2xl p-4 text-white shadow-inner max-w-[260px] mx-auto w-full space-y-3">
+                <div className="text-right pb-1 border-b border-gray-700">
+                  <p className="text-[10px] text-gray-400 font-mono">Calculator Disguise</p>
+                  <div className="text-2xl font-light font-mono py-1 tracking-wider overflow-hidden">{calcDisplay}</div>
+                </div>
+                <div className="grid grid-cols-4 gap-2 text-xs font-semibold">
+                  {['C', '%', '÷', '×', '7', '8', '9', '-', '4', '5', '6', '+', '1', '2', '3', '='].map((btn) => (
+                    <button
+                      key={btn}
+                      onClick={() => handleCalcBtn(btn)}
+                      className={`h-9 rounded-xl flex items-center justify-center font-bold text-sm transition-all active:scale-95 ${
+                        btn === '='
+                          ? 'bg-pink-primary hover:bg-pink-primary/90 text-white font-extrabold col-span-1 shadow-sm'
+                          : btn === 'C'
+                          ? 'bg-gray-700 hover:bg-gray-600 text-status-amber'
+                          : ['%', '÷', '×', '-', '+'].includes(btn)
+                          ? 'bg-gray-700 hover:bg-gray-600 text-pink-primary'
+                          : 'bg-[#333333] hover:bg-[#444444] text-white'
+                      }`}
+                    >
+                      {btn}
+                    </button>
+                  ))}
+                </div>
+                <div className="bg-white/5 rounded-xl p-2 text-center border border-white/10 space-y-0.5">
+                  <p className="text-[10px] font-bold text-pink-300">
+                    💡 Disguise Demo: Enter PIN <strong>1234</strong> then <strong>=</strong>
+                  </p>
+                  <p className="text-[9px] text-gray-400">
+                    Silently triggers offline SOS beacon
+                  </p>
+                </div>
               </div>
-              <div className="grid grid-cols-4 gap-1.5 text-xs font-semibold">
-                {['C', '%', '÷', '×', '7', '8', '9', '-', '4', '5', '6', '+', '1', '2', '3', '='].map((btn) => (
-                  <button
-                    key={btn}
-                    onClick={() => handleCalcBtn(btn)}
-                    className="h-8 rounded-lg bg-[#333333] hover:bg-[#444444] flex items-center justify-center"
-                  >
-                    {btn}
-                  </button>
-                ))}
+
+              {/* Bottom Status Chips */}
+              <div className="flex items-center justify-between text-xs font-bold pt-3 border-t border-pink-border text-ink-secondary">
+                <span className="flex items-center gap-1 text-status-safe">
+                  <span className="w-2 h-2 rounded-full bg-status-safe" />
+                  Disguised App Active
+                </span>
+                <span>Background BLE Ready</span>
               </div>
-              <p className="text-[10px] text-pink-300 text-center">PIN 1234 then = to trigger SOS</p>
             </div>
           ) : (
-            /* SOS Trigger Interface */
-            <div className="flex flex-col items-center justify-center py-4 text-center space-y-3">
-              {sosState === 'idle' && (
-                <>
-                  <div className="relative">
-                    <div className="w-28 h-28 rounded-full bg-pink-100 flex items-center justify-center animate-pulse-ring" />
-                    <button
-                      onClick={handleTriggerSos}
-                      className="absolute inset-0 m-auto w-24 h-24 rounded-full bg-gradient-to-tr from-[#FF2D78] to-[#E91E63] text-white shadow-xl flex flex-col items-center justify-center hover:scale-105 active:scale-95 transition-all"
-                    >
-                      <AlertCircle className="w-8 h-8" />
-                      <span className="text-[10px] font-black tracking-wider mt-0.5">TAP SOS</span>
-                    </button>
+            <div className="flex-1 flex flex-col justify-between py-6 space-y-5">
+              {stage === 'idle' && (
+                <div className="flex flex-col items-center justify-center py-6 text-center space-y-6">
+                  {/* 160px Centered Solid Pink SOS Button */}
+                  <button
+                    onClick={handleStartSos}
+                    className="w-40 h-40 rounded-full bg-pink-primary active:bg-pink-pressed text-white shadow-pink-action hover:scale-105 active:scale-95 transition-all flex flex-col items-center justify-center border-4 border-white"
+                  >
+                    <Shield className="w-12 h-12 text-white" />
+                    <span className="text-sm font-extrabold tracking-wider mt-2">
+                      {t.phoneA.holdForHelp}
+                    </span>
+                  </button>
+
+                  <div className="space-y-1">
+                    <p className="text-sm font-bold text-ink-primary">
+                      1-Tap Offline Distress Trigger
+                    </p>
+                    <p className="text-xs text-ink-secondary">
+                      Requires zero internet, SIM card, or pairing.
+                    </p>
                   </div>
-                  <p className="text-[11px] text-gray-500">Tap or simulate 5 power toggles</p>
-                </>
+                </div>
               )}
 
-              {sosState === 'countdown' && (
-                <div className="space-y-2 w-full">
-                  <div className="w-16 h-16 rounded-full bg-pink-600 text-white flex items-center justify-center text-2xl font-black mx-auto animate-bounce">
-                    {countdown}s
+              {stage === 'countdown' && (
+                <div className="flex flex-col items-center justify-center py-6 text-center space-y-5">
+                  <div className="w-28 h-28 rounded-full bg-status-danger text-white flex items-center justify-center text-5xl font-black shadow-lg animate-pulse">
+                    {countdown}
                   </div>
-                  <p className="text-xs font-extrabold text-[#E91E63]">SOS Countdown ({countdown}s)</p>
+                  <div className="space-y-1">
+                    <p className="text-base font-extrabold text-status-danger">
+                      {t.phoneA.countdown} {countdown}s
+                    </p>
+                    <p className="text-xs text-ink-secondary">
+                      Capturing offline GPS coordinates...
+                    </p>
+                  </div>
                   <button
-                    onClick={handleCancelCountdown}
-                    className="w-full py-2 rounded-xl bg-gray-900 text-white text-xs font-bold"
+                    onClick={handleCancel}
+                    className="w-full py-3.5 rounded-btn bg-white border-2 border-pink-border text-ink-primary font-bold text-sm hover:bg-pink-soft transition-all"
                   >
-                    I'M SAFE (CANCEL)
+                    {t.phoneA.cancel}
                   </button>
                 </div>
               )}
 
-              {sosState === 'broadcasting' && (
-                <div className="space-y-3 w-full">
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-100 text-red-700 text-[10px] font-bold animate-pulse">
-                    <Radio className="w-3 h-3" />
-                    <span>Broadcasting BLE (0xFDE1, TTL 4)</span>
+              {isBroadcasting && (
+                <div className="space-y-4">
+                  {/* Broadcasting Status Pill */}
+                  <div className="flex items-center justify-between px-3.5 py-2 rounded-2xl bg-status-danger/10 border border-status-danger text-status-danger">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-status-danger animate-ping" />
+                      <span className="text-xs font-black uppercase tracking-wide">
+                        {t.phoneA.broadcasting}
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-mono font-bold">17 Bytes</span>
                   </div>
 
-                  <div className={`p-3 rounded-xl border text-left ${
-                    responderCount > 0 ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : 'bg-pink-50 border-pink-200 text-pink-900'
+                  <div className="bg-white rounded-2xl p-4 border border-pink-border space-y-1">
+                    <p className="text-sm font-bold text-ink-primary">
+                      Help is being alerted. Stay calm.
+                    </p>
+                    <p className="text-xs text-ink-secondary">
+                      {t.phoneA.meshLine}
+                    </p>
+                  </div>
+
+                  {/* Live Responder Counter Card */}
+                  <div className={`p-4 rounded-2xl border-2 transition-all ${
+                    responderCount > 0
+                      ? 'bg-status-safe/10 border-status-safe text-status-safe'
+                      : 'bg-pink-soft border-pink-border text-ink-primary'
                   }`}>
-                    <p className="text-xs font-black">
-                      {responderCount > 0 ? `👥 ${responderCount} Remote Responder(s) Confirmed!` : 'Awaiting Peer ACKs...'}
-                    </p>
-                    <p className="text-[10px] opacity-80 mt-0.5">
-                      {responderCount > 0 ? 'Confirmation received via Mesh Relay (Phone B)!' : 'Direct reach: Phone B only'}
-                    </p>
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white ${
+                        responderCount > 0 ? 'bg-status-safe' : 'bg-pink-primary'
+                      }`}>
+                        {responderCount > 0 ? <CheckCircle className="w-5 h-5" /> : <Shield className="w-5 h-5" />}
+                      </div>
+                      <div>
+                        <p className="text-sm font-black">
+                          {responderCount > 0 ? t.phoneA.respondersActive : t.phoneA.respondersZero}
+                        </p>
+                        <p className="text-xs opacity-80">
+                          {responderCount > 0 ? t.phoneA.ackNotice : 'Listening for 2-way ACK beacons...'}
+                        </p>
+                      </div>
+                    </div>
                   </div>
 
+                  {/* "I'm Safe" Button */}
                   <button
-                    onClick={handleResetSimulator}
-                    className="w-full py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold"
+                    onClick={handleReset}
+                    className="w-full py-3.5 rounded-btn bg-status-safe text-white font-extrabold text-sm hover:opacity-90 shadow-sm transition-all"
                   >
-                    STOP BROADCAST
+                    {t.phoneA.imSafe}
                   </button>
                 </div>
               )}
+
+              {/* Bottom Status Chips */}
+              <div className="flex items-center justify-between text-xs font-bold pt-3 border-t border-pink-border text-ink-secondary">
+                <span className="flex items-center gap-1 text-status-safe">
+                  <span className="w-2 h-2 rounded-full bg-status-safe" />
+                  Bluetooth ON
+                </span>
+                <span>GPS: 28.6139, 77.2090</span>
+              </div>
+
             </div>
           )}
+
+          {/* Animated Packet Arrow to Phone B (Visible on Desktop) */}
+          <div className="hidden lg:flex absolute -right-4 top-1/2 -translate-y-1/2 z-20">
+            <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center shadow-md transition-all ${
+              stage === 'hop1_sending'
+                ? 'bg-pink-primary text-white border-white animate-bounce'
+                : isPacketAtB
+                ? 'bg-status-safe text-white border-white'
+                : 'bg-white text-ink-secondary border-pink-border'
+            }`}>
+              <ArrowRight className="w-4 h-4" />
+            </div>
+          </div>
         </div>
 
-        {/* ================= DEVICE 2 (PHONE B: MESH RELAY) ================= */}
-        <div className="bg-gradient-to-b from-[#FAF5FF] to-white rounded-3xl p-5 border-2 border-purple-200 shadow-md space-y-3.5">
-          <div className="flex items-center justify-between pb-2.5 border-b border-purple-100">
+        {/* ========================================================= */}
+        {/* PHONE B: RELAY NODE (MESH FORWARDER) */}
+        {/* ========================================================= */}
+        <div className={`flex flex-col rounded-[32px] p-5 border-2 shadow-flat-card relative transition-all ${
+          isRelayEnabled ? 'bg-bg-app border-pink-border' : 'bg-gray-100 border-gray-300 opacity-80'
+        }`}>
+          
+          {/* Top Chassis / Notch */}
+          <div className="flex items-center justify-between pb-3 border-b border-pink-border text-xs font-bold text-ink-secondary">
             <div className="flex items-center gap-1.5">
-              <Smartphone className="w-4 h-4 text-purple-600" />
-              <h4 className="text-xs font-extrabold text-[#2D1522]">Phone B (Relay Node)</h4>
+              <span className={`w-2.5 h-2.5 rounded-full ${isRelayEnabled ? 'bg-status-guardian' : 'bg-gray-400'}`} />
+              <span className="text-ink-primary font-black">{t.phoneB.title}</span>
             </div>
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700">
-              Mesh Forwarder
+            <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
+              isRelayEnabled ? 'bg-blue-100 text-status-guardian' : 'bg-gray-200 text-gray-700'
+            }`}>
+              {isRelayEnabled ? t.phoneB.statusActive : t.phoneB.statusDisabled}
             </span>
           </div>
 
-          {/* Relay Control Toggle */}
-          <div className="bg-white rounded-xl p-3 border border-purple-200 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold text-gray-800">Relay Forwarding</p>
-              <p className="text-[10px] text-gray-500">{isRelayEnabled ? 'Active (Forwards TTL-1)' : 'Disabled (Breaks Mesh)'}</p>
-            </div>
-            <button
-              onClick={() => setIsRelayEnabled(!isRelayEnabled)}
-              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${
-                isRelayEnabled
-                  ? 'bg-purple-600 hover:bg-purple-700 text-white shadow-sm'
-                  : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
-              }`}
-            >
-              {isRelayEnabled ? 'Disable Relay' : 'Enable Relay'}
-            </button>
-          </div>
-
-          {phoneBAlert ? (
-            <div className="space-y-2.5 text-left text-xs animate-fadeIn">
-              <div className="bg-purple-600 text-white p-3 rounded-xl">
-                <p className="font-black text-xs">🚨 DISTRESS RECEIVED</p>
-                <p className="text-[10px] opacity-90 mt-0.5">Sender: {phoneBAlert.senderId} • Ingress TTL: {phoneBAlert.ttl}</p>
-              </div>
-
-              <div className="bg-white p-3 rounded-xl border border-purple-200 space-y-1">
-                <div className="flex justify-between text-[11px] font-bold text-gray-600">
-                  <span>Relay Policy Decision:</span>
-                  <span className={isRelayEnabled ? 'text-purple-700 font-mono' : 'text-red-600'}>
-                    {isRelayEnabled ? 'ALERT_AND_RELAY (TTL: 3)' : 'ALERT_ONLY (Relay Off)'}
-                  </span>
+          {/* Screen Content */}
+          <div className="flex-1 flex flex-col justify-between py-6 space-y-5">
+            
+            {!isRelayEnabled ? (
+              <div className="flex flex-col items-center justify-center py-10 text-center space-y-3">
+                <div className="w-16 h-16 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center">
+                  <WifiOff className="w-8 h-8" />
                 </div>
-                <p className="text-[10px] text-gray-500">
-                  {isRelayEnabled
-                    ? (isPhoneBRelaying ? '⚡ Transmitting 10s relay beacon...' : '✓ Relay frame forwarded to Phone C')
-                    : 'Relay suppressed by manual toggle'}
+                <h4 className="text-base font-extrabold text-gray-800">
+                  Relay Phone Disabled
+                </h4>
+                <p className="text-xs text-gray-600 max-w-xs">
+                  This phone is powered off or relay is disabled. Incoming packets cannot be forwarded to distant responders.
+                </p>
+                {stage === 'hop1_reached' && (
+                  <div className="px-3 py-1.5 rounded-xl bg-status-danger/10 text-status-danger border border-status-danger text-xs font-bold">
+                    Packet Dropped: Cannot Bridge to Phone C
+                  </div>
+                )}
+              </div>
+            ) : !isPacketAtB ? (
+              <div className="flex flex-col items-center justify-center py-10 text-center space-y-3">
+                <div className="w-16 h-16 rounded-full bg-blue-50 text-status-guardian flex items-center justify-center border border-blue-200">
+                  <Radio className="w-8 h-8 animate-pulse" />
+                </div>
+                <h4 className="text-base font-extrabold text-ink-primary">
+                  Relay Standing By
+                </h4>
+                <p className="text-xs text-ink-secondary max-w-xs">
+                  {t.phoneB.waiting}
                 </p>
               </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Hop Telemetry Card */}
+                <div className="bg-white rounded-2xl p-4 border border-pink-border space-y-3">
+                  <div className="flex items-center justify-between text-xs font-bold text-ink-secondary">
+                    <span>BLE Flooding Forwarder</span>
+                    <span className="text-status-guardian font-mono">UUID 0xFDE1</span>
+                  </div>
+
+                  <div className="space-y-1">
+                    <p className="text-sm font-extrabold text-ink-primary">
+                      {stage === 'hop1_reached' ? 'Packet Received from Sender #7842' : 'Packet Re-broadcasted as Hop 2'}
+                    </p>
+                    <p className="text-xs text-ink-secondary font-mono">
+                      TTL: 3 → 2 | Hop Count: 1 → 2
+                    </p>
+                  </div>
+
+                  {/* 2-Column Telemetry Counter Tiles */}
+                  <div className="grid grid-cols-2 gap-2 pt-1 font-mono text-center">
+                    <div className="bg-bg-app p-2.5 rounded-xl border border-pink-border">
+                      <p className="text-xs text-ink-secondary">Packets In</p>
+                      <p className="text-lg font-black text-status-guardian">1</p>
+                    </div>
+                    <div className="bg-bg-app p-2.5 rounded-xl border border-pink-border">
+                      <p className="text-xs text-ink-secondary">Relayed Out</p>
+                      <p className="text-lg font-black text-status-safe">1</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Packet Deduplication Status */}
+                <div className="p-3 rounded-2xl bg-blue-50 border border-blue-200 text-status-guardian text-xs font-semibold flex items-center gap-2">
+                  <Activity className="w-4 h-4 flex-shrink-0" />
+                  <span>Deduplication cache active: Identical sender hash dropped to prevent storming.</span>
+                </div>
+              </div>
+            )}
+
+            {/* Bottom Status */}
+            <div className="flex items-center justify-between text-xs font-bold pt-3 border-t border-pink-border text-ink-secondary">
+              <span className="flex items-center gap-1">
+                <span className={`w-2 h-2 rounded-full ${isRelayEnabled ? 'bg-status-safe' : 'bg-gray-400'}`} />
+                {isRelayEnabled ? 'Hop Budget: 3' : 'Offline'}
+              </span>
+              <span>Mesh Flooding: Active</span>
             </div>
-          ) : (
-            <div className="py-12 text-center text-xs text-gray-400 space-y-2">
-              <Radio className="w-6 h-6 mx-auto text-purple-400 animate-pulse" />
-              <p>Relay Scanner Idle</p>
-              <p className="text-[10px] text-gray-400">Listens for Phone A and bridges to Phone C</p>
+
+          </div>
+
+          {/* Animated Packet Arrow to Phone C (Visible on Desktop) */}
+          <div className="hidden lg:flex absolute -right-4 top-1/2 -translate-y-1/2 z-20">
+            <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center shadow-md transition-all ${
+              !isRelayEnabled
+                ? 'bg-status-danger text-white border-white'
+                : stage === 'hop2_sending'
+                ? 'bg-pink-primary text-white border-white animate-bounce'
+                : isPacketAtC
+                ? 'bg-status-safe text-white border-white'
+                : 'bg-white text-ink-secondary border-pink-border'
+            }`}>
+              {!isRelayEnabled ? <XCircle className="w-4 h-4" /> : <ArrowRight className="w-4 h-4" />}
             </div>
-          )}
+          </div>
         </div>
 
-        {/* ================= DEVICE 3 (PHONE C: DISTANT RESPONDER) ================= */}
-        <div className="bg-gradient-to-b from-[#F0FDF4] to-white rounded-3xl p-5 border-2 border-emerald-200 shadow-md space-y-3.5">
-          <div className="flex items-center justify-between pb-2.5 border-b border-emerald-100">
+        {/* ========================================================= */}
+        {/* PHONE C: GUARDIAN / RESPONDER */}
+        {/* ========================================================= */}
+        <div className="flex flex-col bg-bg-app rounded-[32px] p-5 border-2 border-pink-border shadow-flat-card relative">
+          
+          {/* Top Chassis / Notch */}
+          <div className="flex items-center justify-between pb-3 border-b border-pink-border text-xs font-bold text-ink-secondary">
             <div className="flex items-center gap-1.5">
-              <Smartphone className="w-4 h-4 text-emerald-600" />
-              <h4 className="text-xs font-extrabold text-[#2D1522]">Phone C (Distant Peer)</h4>
+              <span className="w-2.5 h-2.5 rounded-full bg-status-safe" />
+              <span className="text-ink-primary font-black">{t.phoneC.title}</span>
             </div>
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
-              Out of A's Range
+            <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-status-safe text-[11px] font-bold">
+              {t.phoneC.role}
             </span>
           </div>
 
-          {phoneCAlert ? (
-            <div className="space-y-2.5 text-left text-xs animate-fadeIn">
-              <div className="bg-red-600 text-white p-3 rounded-xl shadow-md">
-                <div className="flex items-center justify-between">
-                  <span className="font-black text-xs">🚨 RELAYED SOS ALARM!</span>
-                  <span className="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded">TTL: {phoneCAlert.ttl}</span>
+          {/* Screen Content */}
+          <div className="flex-1 flex flex-col justify-between py-6 space-y-5">
+            
+            {!isPacketAtC ? (
+              <div className="flex flex-col items-center justify-center py-10 text-center space-y-3">
+                <div className="w-16 h-16 rounded-full bg-emerald-50 text-status-safe flex items-center justify-center border border-emerald-200">
+                  <Radio className="w-8 h-8 animate-pulse" />
                 </div>
-                <p className="text-[10px] opacity-90 mt-0.5">Victim ID: {phoneCAlert.senderId} (via {phoneCAlert.relayedBy})</p>
+                <h4 className="text-base font-extrabold text-ink-primary">
+                  {t.phoneC.status}
+                </h4>
+                <p className="text-xs text-ink-secondary max-w-xs">
+                  {t.phoneC.waiting}
+                </p>
               </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Emergency Alert Banner */}
+                <div className="bg-status-danger rounded-2xl p-4 text-white shadow-sm space-y-1">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="w-5 h-5 animate-bounce" />
+                      <span className="text-xs font-black uppercase tracking-wider">
+                        {t.phoneC.alertTitle}
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-mono bg-white/20 px-2 py-0.5 rounded">
+                      Sender #7842
+                    </span>
+                  </div>
+                  <p className="text-xs font-semibold opacity-90">
+                    BLE Beacon detected via relay hop.
+                  </p>
+                </div>
 
-              <div className="bg-white p-2.5 rounded-xl border border-emerald-200 space-y-1">
-                <p className="text-[10px] text-gray-500 font-bold">Offline Coordinates:</p>
-                <p className="font-mono font-bold text-gray-800 text-[11px]">{phoneCAlert.lat}, {phoneCAlert.lon}</p>
-              </div>
+                {/* Distance Bucket & Direction Arrow */}
+                <div className="bg-white rounded-2xl p-4 border border-pink-border space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <p className="text-xs text-ink-secondary font-bold">Estimated Proximity</p>
+                      <p className="text-2xl font-black text-status-safe">
+                        {t.phoneC.distanceBucket}
+                      </p>
+                    </div>
+                    <div className="w-10 h-10 rounded-full bg-pink-soft text-pink-primary flex items-center justify-center">
+                      <Navigation className="w-5 h-5 rotate-45" />
+                    </div>
+                  </div>
 
-              <button
-                onClick={handlePhoneCSendAck}
-                disabled={isPhoneCAckSent}
-                className={`w-full py-2.5 rounded-xl text-xs font-black tracking-wide transition-all ${
-                  isPhoneCAckSent
-                    ? 'bg-emerald-700 text-white cursor-default'
-                    : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md active:scale-95'
-                }`}
-              >
-                {isPhoneCAckSent ? '✓ ACK TRANSMITTED VIA RELAY' : 'SEND RESPONDER ACK'}
-              </button>
+                  <div className="flex items-center justify-between text-xs font-mono text-ink-secondary pt-1 border-t border-pink-border">
+                    <span className="px-2 py-0.5 rounded bg-blue-50 text-status-guardian font-bold">
+                      {t.phoneC.hopsBadge}
+                    </span>
+                    <span>RSSI: -58 dBm</span>
+                  </div>
+                </div>
 
-              <div className="grid grid-cols-2 gap-1.5">
+                {/* 1-Tap Responder ACK Action */}
                 <button
-                  onClick={() => setIsPhoneCSirenOn(!isPhoneCSirenOn)}
-                  className={`py-1.5 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 border ${
-                    isPhoneCSirenOn ? 'bg-red-600 text-white' : 'bg-white text-gray-700'
+                  onClick={handleSendAck}
+                  disabled={isAckSent}
+                  className={`w-full py-4 rounded-btn text-sm font-extrabold shadow-sm transition-all flex items-center justify-center gap-2 ${
+                    isAckSent
+                      ? 'bg-status-safe text-white cursor-default'
+                      : 'bg-status-safe active:bg-emerald-800 text-white hover:opacity-95'
                   }`}
                 >
-                  <Volume2 className="w-3 h-3" />
-                  <span>{isPhoneCSirenOn ? 'Siren On' : 'Siren'}</span>
+                  <CheckCircle className="w-5 h-5" />
+                  <span>{isAckSent ? t.phoneC.ackSentBtn : t.phoneC.respondingBtn}</span>
                 </button>
-                <button
-                  onClick={() => setIsPhoneCTorchOn(!isPhoneCTorchOn)}
-                  className={`py-1.5 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 border ${
-                    isPhoneCTorchOn ? 'bg-amber-500 text-white' : 'bg-white text-gray-700'
-                  }`}
-                >
-                  <Flashlight className="w-3 h-3" />
-                  <span>{isPhoneCTorchOn ? 'Torch On' : 'Torch'}</span>
-                </button>
+
+                {/* Deterrent Tools */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setIsSirenOn(!isSirenOn)}
+                    className={`py-2.5 rounded-btn text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${
+                      isSirenOn ? 'bg-status-danger text-white border-status-danger' : 'bg-white text-ink-primary border-pink-border hover:bg-pink-soft'
+                    }`}
+                  >
+                    <Volume2 className="w-4 h-4" />
+                    <span>{isSirenOn ? 'Siren Playing' : t.phoneC.sirenBtn}</span>
+                  </button>
+                  <button
+                    onClick={() => setIsTorchOn(!isTorchOn)}
+                    className={`py-2.5 rounded-btn text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${
+                      isTorchOn ? 'bg-status-amber text-white border-status-amber' : 'bg-white text-ink-primary border-pink-border hover:bg-pink-soft'
+                    }`}
+                  >
+                    <Flashlight className="w-4 h-4" />
+                    <span>{isTorchOn ? 'Torch Active' : t.phoneC.torchBtn}</span>
+                  </button>
+                </div>
               </div>
+            )}
+
+            {/* Bottom Status */}
+            <div className="flex items-center justify-between text-xs font-bold pt-3 border-t border-pink-border text-ink-secondary">
+              <span className="flex items-center gap-1 text-status-safe">
+                <span className="w-2 h-2 rounded-full bg-status-safe" />
+                Guardian Active
+              </span>
+              <span>Offline GPS Cached</span>
             </div>
-          ) : (
-            <div className="py-12 text-center text-xs text-gray-400 space-y-2">
-              <Radio className="w-6 h-6 mx-auto text-emerald-400" />
-              <p>Out of Direct Range of Phone A</p>
-              <p className="text-[10px] text-gray-400">
-                {isRelayEnabled ? 'Will ring only when Phone B relays the packet' : 'Relay disabled on B: will receive nothing'}
-              </p>
-            </div>
-          )}
+
+          </div>
+
         </div>
 
+      </div>
+
+      {/* Caption Footer: Explaining the Flooding Mesh Algorithm */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-pink-border text-xs text-ink-secondary">
+        <div className="bg-bg-app p-3 rounded-2xl border border-pink-border">
+          <p className="font-bold text-ink-primary">1. Zero Infrastructure</p>
+          <p className="mt-0.5">Alert travels over raw Bluetooth Low Energy advertisements (0xFDE1). Works without internet or mobile towers.</p>
+        </div>
+        <div className="bg-bg-app p-3 rounded-2xl border border-pink-border">
+          <p className="font-bold text-ink-primary">2. Flooding & Deduplication</p>
+          <p className="mt-0.5">Every bystander phone acts as an autonomous relay node. LRU cache prevents broadcast loops and battery drain.</p>
+        </div>
+        <div className="bg-bg-app p-3 rounded-2xl border border-pink-border">
+          <p className="font-bold text-ink-primary">3. Two-Way Confirmation</p>
+          <p className="mt-0.5">When a responder acknowledges the alert, an ACK beacon bounces back through the mesh to reassure the victim.</p>
+        </div>
       </div>
 
     </section>

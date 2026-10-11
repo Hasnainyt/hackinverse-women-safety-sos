@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { MapPin, Phone, Shield, Navigation, Building2, Train, Hospital } from 'lucide-react'
+import { MapPin, Phone, Navigation } from 'lucide-react'
 
 export default function SafeZonesExplorer() {
   const [activeFilter, setActiveFilter] = useState('all')
@@ -57,15 +57,15 @@ export default function SafeZonesExplorer() {
     : safeZones.filter((z) => z.type === activeFilter)
 
   return (
-    <section className="bg-white rounded-3xl p-6 lg:p-8 border border-pink-200 shadow-soft-pink space-y-6">
+    <section className="bg-white rounded-card p-6 lg:p-10 border-2 border-pink-border shadow-flat-card space-y-6">
       
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h3 className="text-2xl font-black text-[#2D1522]">
-            Offline Safe Zones & Emergency Directory
+          <h3 className="text-2xl lg:text-3xl font-extrabold text-ink-primary tracking-tight">
+            Offline Tactical Safe Havens
           </h3>
-          <p className="text-xs sm:text-sm text-gray-600 font-medium mt-1">
+          <p className="text-sm text-ink-secondary font-medium mt-1">
             Pre-cached emergency safety locations available offline with 1-tap navigation and emergency dialing.
           </p>
         </div>
@@ -75,21 +75,21 @@ export default function SafeZonesExplorer() {
           <div className="flex items-center gap-2">
             <a
               href="tel:112"
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-sm transition-all"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-btn bg-status-danger text-white text-xs font-bold shadow-sm hover:opacity-90 transition-all"
             >
               <Phone className="w-3.5 h-3.5" />
               <span>112 All Emergency</span>
             </a>
             <a
               href="tel:1091"
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#E91E63] hover:bg-[#C2185B] text-white text-xs font-bold shadow-sm transition-all"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-btn bg-pink-primary text-white text-xs font-bold shadow-sm hover:bg-pink-pressed transition-all"
             >
               <Phone className="w-3.5 h-3.5" />
               <span>1091 Women Help</span>
             </a>
           </div>
-          <span className="text-[10px] text-gray-500 font-medium">
-            *Emergency voice calls require active cellular carrier signal
+          <span className="text-[11px] text-ink-secondary font-medium">
+            *Emergency voice dialers trigger device cellular phone app
           </span>
         </div>
       </div>
@@ -106,10 +106,10 @@ export default function SafeZonesExplorer() {
           <button
             key={btn.id}
             onClick={() => setActiveFilter(btn.id)}
-            className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+            className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${
               activeFilter === btn.id
-                ? 'bg-[#FF2D78] text-white shadow-sm'
-                : 'bg-pink-50 text-gray-700 hover:bg-pink-100 border border-pink-200'
+                ? 'bg-pink-primary text-white shadow-sm'
+                : 'bg-bg-app text-ink-secondary hover:bg-pink-soft border border-pink-border'
             }`}
           >
             {btn.label}
@@ -118,35 +118,35 @@ export default function SafeZonesExplorer() {
       </div>
 
       {/* List of Safe Zones */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {filtered.map((zone) => (
           <div
             key={zone.id}
-            className="bg-[#FFF5F8] rounded-2xl p-5 border border-pink-200/80 hover:border-pink-300 shadow-sm flex flex-col justify-between space-y-4 hover:-translate-y-0.5 transition-all"
+            className="bg-bg-app rounded-2xl p-5 border border-pink-border hover:border-pink-primary shadow-sm flex flex-col justify-between space-y-4 transition-all"
           >
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md bg-pink-100 text-[#E91E63]">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md bg-pink-soft text-pink-primary border border-pink-border">
                   {zone.typeLabel}
                 </span>
-                <span className="text-[10px] font-mono text-gray-500">
+                <span className="text-[11px] font-mono font-bold text-ink-secondary">
                   {zone.coords}
                 </span>
               </div>
 
-              <h4 className="text-sm font-extrabold text-[#2D1522] leading-snug">
+              <h4 className="text-base font-extrabold text-ink-primary leading-snug">
                 {zone.name}
               </h4>
-              <p className="text-xs text-gray-600 font-medium mt-1 flex items-start gap-1">
-                <MapPin className="w-3.5 h-3.5 text-pink-500 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-ink-secondary font-medium mt-1 flex items-start gap-1.5">
+                <MapPin className="w-4 h-4 text-pink-primary flex-shrink-0 mt-0.5" />
                 <span>{zone.address}</span>
               </p>
             </div>
 
-            <div className="flex items-center gap-2 pt-2 border-t border-pink-100">
+            <div className="flex items-center gap-2 pt-2 border-t border-pink-border">
               <a
                 href={`tel:${zone.phone}`}
-                className="flex-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold text-center flex items-center justify-center gap-1.5 shadow-sm transition-all"
+                className="flex-1 py-2.5 rounded-btn bg-status-safe text-white text-xs font-bold text-center flex items-center justify-center gap-1.5 shadow-sm hover:opacity-90 transition-all"
               >
                 <Phone className="w-3.5 h-3.5" />
                 <span>Call {zone.phone}</span>
@@ -156,9 +156,9 @@ export default function SafeZonesExplorer() {
                 href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(zone.coords)}`}
                 target="_blank"
                 rel="noreferrer"
-                className="px-3 py-2 rounded-xl bg-white hover:bg-pink-50 border border-pink-200 text-gray-700 text-xs font-bold flex items-center justify-center gap-1 transition-all"
+                className="px-4 py-2.5 rounded-btn bg-white hover:bg-pink-soft border border-pink-border text-ink-primary text-xs font-bold flex items-center justify-center gap-1 transition-all"
               >
-                <Navigation className="w-3.5 h-3.5 text-[#FF2D78]" />
+                <Navigation className="w-3.5 h-3.5 text-pink-primary" />
                 <span>Maps</span>
               </a>
             </div>

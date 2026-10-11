@@ -28,9 +28,6 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -41,6 +38,7 @@ import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -59,9 +57,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.brokencoders.narisuraksha.core.Constants
 import com.brokencoders.narisuraksha.data.SosEventEntity
+import com.brokencoders.narisuraksha.ui.components.AppCard
+import com.brokencoders.narisuraksha.ui.theme.BorderDivider
 import com.brokencoders.narisuraksha.ui.theme.EmergencyRed
 import com.brokencoders.narisuraksha.ui.theme.GuardianBlue
+import com.brokencoders.narisuraksha.ui.theme.PrimaryPink
 import com.brokencoders.narisuraksha.ui.theme.SafeGreen
+import com.brokencoders.narisuraksha.ui.theme.SoftPinkSurface
 import com.brokencoders.narisuraksha.ui.theme.TextMuted
 import com.brokencoders.narisuraksha.ui.theme.TextPrimary
 import com.brokencoders.narisuraksha.ui.theme.TextSecondary
@@ -102,7 +104,7 @@ fun HistoryScreen(
             title = {
                 Text(
                     text = "Clear Incident History & Evidence?",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = TextPrimary
                 )
             },
@@ -119,7 +121,8 @@ fun HistoryScreen(
                         viewModel.clearAllHistory()
                         showClearAllConfirmation = false
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = EmergencyRed)
+                    colors = ButtonDefaults.buttonColors(containerColor = EmergencyRed),
+                    shape = RoundedCornerShape(14.dp)
                 ) {
                     Text("Permanently Erase", color = Color.White, fontWeight = FontWeight.Bold)
                 }
@@ -131,7 +134,8 @@ fun HistoryScreen(
                     Text("Cancel", color = TextSecondary)
                 }
             },
-            containerColor = Color(0xFF222222)
+            shape = RoundedCornerShape(24.dp),
+            containerColor = MaterialTheme.colorScheme.surface
         )
     }
 
@@ -142,30 +146,38 @@ fun HistoryScreen(
                     Text(
                         text = "SOS Incident History",
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                        color = TextPrimary
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.size(56.dp)
+                    ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = TextPrimary
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(28.dp)
                         )
                     }
                 },
                 actions = {
                     if (events.isNotEmpty()) {
-                        IconButton(onClick = { showClearAllConfirmation = true }) {
+                        IconButton(
+                            onClick = { showClearAllConfirmation = true },
+                            modifier = Modifier.size(56.dp)
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.Delete,
                                 contentDescription = "Clear All",
-                                tint = TextMuted
+                                tint = EmergencyRed,
+                                modifier = Modifier.size(26.dp)
                             )
                         }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF181818))
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         },
         containerColor = MaterialTheme.colorScheme.background
@@ -178,29 +190,29 @@ fun HistoryScreen(
             // Tabs: All, Sent, Received
             TabRow(
                 selectedTabIndex = selectedTab,
-                containerColor = Color(0xFF181818),
-                contentColor = TextPrimary,
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = PrimaryPink,
                 indicator = { tabPositions ->
                     TabRowDefaults.SecondaryIndicator(
                         Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                        color = EmergencyRed
+                        color = PrimaryPink
                     )
                 }
             ) {
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    text = { Text("All (${events.size})", fontWeight = FontWeight.SemiBold) }
+                    text = { Text("All (${events.size})", fontWeight = FontWeight.SemiBold, fontSize = 15.sp) }
                 )
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    text = { Text("My Broadcasts", fontWeight = FontWeight.SemiBold) }
+                    text = { Text("My Broadcasts", fontWeight = FontWeight.SemiBold, fontSize = 15.sp) }
                 )
                 Tab(
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2 },
-                    text = { Text("Received", fontWeight = FontWeight.SemiBold) }
+                    text = { Text("Received", fontWeight = FontWeight.SemiBold, fontSize = 15.sp) }
                 )
             }
 
@@ -212,22 +224,31 @@ fun HistoryScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Default.NearMe,
-                            contentDescription = null,
-                            tint = TextMuted,
-                            modifier = Modifier.size(48.dp)
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(72.dp)
+                                .clip(CircleShape)
+                                .background(SoftPinkSurface),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.NearMe,
+                                contentDescription = null,
+                                tint = PrimaryPink,
+                                modifier = Modifier.size(36.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
                         Text(
                             text = "No Incident Records",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = TextSecondary
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                            color = TextPrimary
                         )
+                        Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = "Recorded SOS broadcasts and received beacons will appear here offline.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TextMuted
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = TextSecondary
                         )
                     }
                 }
@@ -235,8 +256,8 @@ fun HistoryScreen(
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     items(filteredEvents, key = { it.id }) { event ->
                         SosHistoryCard(
@@ -263,12 +284,8 @@ private fun SosHistoryCard(
     val dateFormat = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
     val dateText = dateFormat.format(Date(event.createdAt))
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+    AppCard {
+        Column {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -277,65 +294,65 @@ private fun SosHistoryCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
-                            .size(32.dp)
+                            .size(40.dp)
                             .clip(CircleShape)
-                            .background(if (isSent) EmergencyRed.copy(alpha = 0.2f) else GuardianBlue.copy(alpha = 0.2f)),
+                            .background(if (isSent) EmergencyRed.copy(alpha = 0.15f) else GuardianBlue.copy(alpha = 0.15f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = if (isSent) Icons.Default.Warning else Icons.Default.NearMe,
                             contentDescription = null,
                             tint = if (isSent) EmergencyRed else GuardianBlue,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(22.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.width(10.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
                             text = if (isSent) "SOS BROADCASTED" else "BEACON RECEIVED",
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
+                                fontSize = 16.sp
                             ),
                             color = if (isSent) EmergencyRed else GuardianBlue
                         )
                         Text(
                             text = dateText,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TextMuted
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextSecondary
                         )
                     }
                 }
 
                 IconButton(
                     onClick = onDelete,
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier.size(40.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Delete,
                         contentDescription = "Delete",
-                        tint = TextMuted,
-                        modifier = Modifier.size(18.dp)
+                        tint = TextSecondary,
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             // Location coordinates info
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "Location: ",
-                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                     color = TextSecondary
                 )
                 Text(
                     text = if (event.lat != null && event.lon != null) {
-                        "${String.format("%.4f", event.lat)}, ${String.format("%.4f", event.lon)}"
+                        "${String.format(Locale.US, "%.4f", event.lat)}, ${String.format(Locale.US, "%.4f", event.lon)}"
                     } else {
                         "Offline / GPS Unavailable"
                     },
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = TextPrimary
                 )
             }
@@ -346,12 +363,12 @@ private fun SosHistoryCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "Distance: ",
-                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                         color = TextSecondary
                     )
                     Text(
                         text = "${bucket.approxDistanceText} (${event.rssi} dBm)",
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = SafeGreen
                     )
                 }
@@ -359,32 +376,34 @@ private fun SosHistoryCard(
 
             // Audio Evidence Player
             if (event.audioPath != null) {
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(16.dp))
                 Button(
                     onClick = onPlayAudio,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isPlayingAudio) SafeGreen else Color(0xFF2C2C2C),
-                        contentColor = Color.White
+                        containerColor = if (isPlayingAudio) SafeGreen else SoftPinkSurface,
+                        contentColor = if (isPlayingAudio) Color.White else PrimaryPink
                     ),
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.fillMaxWidth().height(42.dp)
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
                 ) {
                     Icon(
                         imageVector = if (isPlayingAudio) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = null,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(24.dp)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = if (isPlayingAudio) "Playing Audio Evidence..." else "Play Audio Evidence",
-                        fontSize = 13.sp,
+                        fontSize = 16.sp,
                         fontWeight = FontWeight.SemiBold
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Icon(
                         imageVector = if (isPlayingAudio) Icons.Default.GraphicEq else Icons.Default.Mic,
                         contentDescription = null,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }

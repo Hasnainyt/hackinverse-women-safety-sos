@@ -1,7 +1,6 @@
 package com.brokencoders.narisuraksha.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,19 +19,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -40,7 +37,6 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -58,15 +54,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.brokencoders.narisuraksha.R
 import com.brokencoders.narisuraksha.data.EmergencyContactEntity
+import com.brokencoders.narisuraksha.ui.components.AppBottomBar
+import com.brokencoders.narisuraksha.ui.components.ConfirmDialog
+import com.brokencoders.narisuraksha.ui.components.EmptyState
+import com.brokencoders.narisuraksha.ui.components.InfoCard
+import com.brokencoders.narisuraksha.ui.components.PrimaryButton
+import com.brokencoders.narisuraksha.ui.components.SecondaryButton
+import com.brokencoders.narisuraksha.ui.theme.BorderDivider
+import com.brokencoders.narisuraksha.ui.theme.CardBackground
 import com.brokencoders.narisuraksha.ui.theme.EmergencyRed
-import com.brokencoders.narisuraksha.ui.theme.GuardianBlue
+import com.brokencoders.narisuraksha.ui.theme.PrimaryPink
 import com.brokencoders.narisuraksha.ui.theme.SafeGreen
-import com.brokencoders.narisuraksha.ui.theme.TextMuted
+import com.brokencoders.narisuraksha.ui.theme.SoftPinkSurface
 import com.brokencoders.narisuraksha.ui.theme.TextPrimary
 import com.brokencoders.narisuraksha.ui.theme.TextSecondary
 import com.brokencoders.narisuraksha.ui.theme.VigilanceAmber
@@ -89,21 +95,30 @@ fun EmergencyContactsScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Emergency Contacts",
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                        color = TextPrimary
+                        text = stringResource(R.string.emergency_contacts_title),
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 20.sp
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.size(56.dp)
+                    ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = TextPrimary
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(28.dp)
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF141414))
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
             )
         },
         floatingActionButton = {
@@ -112,12 +127,25 @@ fun EmergencyContactsScreen(
                     contactToEdit = null
                     showAddEditDialog = true
                 },
-                containerColor = EmergencyRed,
+                containerColor = PrimaryPink,
                 contentColor = Color.White,
-                shape = CircleShape
+                shape = CircleShape,
+                modifier = Modifier.size(64.dp)
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Add Contact")
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = stringResource(R.string.add_contact),
+                    modifier = Modifier.size(32.dp)
+                )
             }
+        },
+        bottomBar = {
+            AppBottomBar(
+                currentRoute = "emergency_contacts",
+                onNavigate = { route ->
+                    if (route != "emergency_contacts") onBack()
+                }
+            )
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
@@ -125,287 +153,300 @@ fun EmergencyContactsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = 20.dp)
         ) {
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // Informational Card
-            Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth()
+            // Informational Header Card
+            InfoCard(
+                backgroundColor = SoftPinkSurface,
+                borderColor = BorderDivider
             ) {
-                Row(
-                    modifier = Modifier.padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
-                            .size(38.dp)
+                            .size(48.dp)
                             .clip(CircleShape)
-                            .background(GuardianBlue.copy(alpha = 0.2f)),
+                            .background(PrimaryPink),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.Person,
                             contentDescription = null,
-                            tint = GuardianBlue,
-                            modifier = Modifier.size(20.dp)
+                            tint = Color.White,
+                            modifier = Modifier.size(26.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Column {
                         Text(
-                            text = "Trusted Emergency Circle",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            text = stringResource(R.string.trusted_circle_title),
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp
+                            ),
                             color = TextPrimary
                         )
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "Stored privately in local database. 1-tap call & SMS available during active distress.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TextMuted
+                            text = stringResource(R.string.trusted_circle_subtitle),
+                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp),
+                            color = TextSecondary
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             if (contacts.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = null,
-                            tint = TextMuted,
-                            modifier = Modifier.size(56.dp)
+                EmptyState(
+                    icon = Icons.Default.Person,
+                    headline = stringResource(R.string.no_contacts_title),
+                    body = stringResource(R.string.no_contacts_subtitle),
+                    action = {
+                        PrimaryButton(
+                            text = stringResource(R.string.add_first_contact),
+                            onClick = {
+                                contactToEdit = null
+                                showAddEditDialog = true
+                            }
                         )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = "No emergency contacts added yet",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = TextSecondary
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "Tap the + button below to add family or friends",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TextMuted
-                        )
-                    }
-                }
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
             } else {
                 LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.fillMaxSize()
                 ) {
                     items(contacts, key = { it.id }) { contact ->
-                        ContactItemCard(
+                        ContactCard(
                             contact = contact,
                             onCall = { viewModel.callContact(contact.phoneNumber) },
-                            onSms = { viewModel.sendEmergencySms(contact.phoneNumber) },
+                            onMessage = { viewModel.sendEmergencySms(contact.phoneNumber) },
+                            onTogglePrimary = {
+                                viewModel.updateEmergencyContact(contact.copy(isPrimary = !contact.isPrimary))
+                            },
                             onEdit = {
                                 contactToEdit = contact
                                 showAddEditDialog = true
                             },
-                            onDelete = { contactToDelete = contact },
-                            onSetPrimary = { viewModel.setPrimaryContact(contact.id) }
+                            onDelete = {
+                                contactToDelete = contact
+                            }
                         )
                     }
+
                     item {
                         Spacer(modifier = Modifier.height(80.dp))
                     }
                 }
             }
         }
-    }
 
-    // Add / Edit Dialog
-    if (showAddEditDialog) {
-        ContactFormDialog(
-            initialContact = contactToEdit,
-            onDismiss = { showAddEditDialog = false },
-            onSave = { name, phone, relationship, isPrimary ->
-                if (contactToEdit != null) {
-                    viewModel.updateEmergencyContact(
-                        contactToEdit!!.copy(
-                            name = name,
-                            phoneNumber = phone,
-                            relationship = relationship,
-                            isPrimary = isPrimary
+        // Add/Edit Dialog
+        if (showAddEditDialog) {
+            AddEditContactDialog(
+                initialContact = contactToEdit,
+                onDismiss = { showAddEditDialog = false },
+                onSave = { name, phone, rel, isPrimary ->
+                    if (contactToEdit != null) {
+                        viewModel.updateEmergencyContact(
+                            contactToEdit!!.copy(
+                                name = name,
+                                phoneNumber = phone,
+                                relationship = rel,
+                                isPrimary = isPrimary
+                            )
                         )
-                    )
-                } else {
-                    viewModel.addEmergencyContact(name, phone, relationship, isPrimary)
+                    } else {
+                        viewModel.addEmergencyContact(name, phone, rel, isPrimary)
+                    }
+                    showAddEditDialog = false
                 }
-                showAddEditDialog = false
-            }
-        )
-    }
+            )
+        }
 
-    // Delete Confirmation Dialog
-    contactToDelete?.let { contact ->
-        AlertDialog(
-            onDismissRequest = { contactToDelete = null },
-            title = { Text("Delete Contact?", color = TextPrimary) },
-            text = { Text("Are you sure you want to remove ${contact.name} from your emergency contacts?", color = TextSecondary) },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.deleteEmergencyContact(contact)
-                        contactToDelete = null
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = EmergencyRed)
-                ) {
-                    Text("Delete")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { contactToDelete = null }) {
-                    Text("Cancel", color = TextSecondary)
-                }
-            },
-            containerColor = Color(0xFF222222)
-        )
+        // Delete Confirmation Dialog
+        contactToDelete?.let { contact ->
+            ConfirmDialog(
+                title = stringResource(R.string.delete_contact_confirm_title),
+                message = stringResource(R.string.delete_contact_confirm_message, contact.name),
+                confirmText = "Delete",
+                dismissText = "Cancel",
+                isDanger = true,
+                onConfirm = {
+                    viewModel.deleteEmergencyContact(contact)
+                    contactToDelete = null
+                },
+                onDismiss = { contactToDelete = null }
+            )
+        }
     }
 }
 
 @Composable
-private fun ContactItemCard(
+private fun ContactCard(
     contact: EmergencyContactEntity,
     onCall: () -> Unit,
-    onSms: () -> Unit,
+    onMessage: () -> Unit,
+    onTogglePrimary: () -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit,
-    onSetPrimary: () -> Unit
+    onDelete: () -> Unit
 ) {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = if (contact.isPrimary) Color(0xFF251A1E) else Color(0xFF191919)
-        ),
-        shape = RoundedCornerShape(14.dp),
-        modifier = Modifier.fillMaxWidth()
+    InfoCard(
+        backgroundColor = CardBackground,
+        borderColor = if (contact.isPrimary) PrimaryPink else BorderDivider
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+        Column {
             Row(
                 modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(42.dp)
-                        .clip(CircleShape)
-                        .background(if (contact.isPrimary) EmergencyRed.copy(alpha = 0.2f) else GuardianBlue.copy(alpha = 0.2f)),
-                    contentAlignment = Alignment.Center
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = contact.name.take(1).uppercase(),
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = if (contact.isPrimary) EmergencyRed else GuardianBlue
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = contact.name,
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = TextPrimary
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(if (contact.isPrimary) SoftPinkSurface else BorderDivider.copy(alpha = 0.5f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = null,
+                            tint = if (contact.isPrimary) PrimaryPink else TextSecondary,
+                            modifier = Modifier.size(24.dp)
                         )
-                        if (contact.isPrimary) {
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .background(EmergencyRed.copy(alpha = 0.2f))
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                            ) {
-                                Text(
-                                    text = "PRIMARY",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Black
-                                    ),
-                                    color = EmergencyRed
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = contact.name,
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 20.sp
+                                ),
+                                color = TextPrimary
+                            )
+
+                            // Star icon for primary contact
+                            if (contact.isPrimary) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Icon(
+                                    imageVector = Icons.Filled.Star,
+                                    contentDescription = stringResource(R.string.primary_contact_star),
+                                    tint = VigilanceAmber,
+                                    modifier = Modifier.size(22.dp)
                                 )
                             }
                         }
+
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = if (contact.relationship.isNotBlank()) {
+                                "${contact.relationship} • ${contact.phoneNumber}"
+                            } else {
+                                contact.phoneNumber
+                            },
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontSize = 16.sp
+                            ),
+                            color = TextSecondary
+                        )
                     }
-
-                    Spacer(modifier = Modifier.height(2.dp))
-
-                    Text(
-                        text = "${contact.relationship} • ${contact.phoneNumber}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextMuted
-                    )
                 }
 
-                // Star for primary toggle
-                IconButton(onClick = onSetPrimary) {
-                    Icon(
-                        imageVector = if (contact.isPrimary) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                        contentDescription = "Primary contact",
-                        tint = if (contact.isPrimary) VigilanceAmber else TextMuted
-                    )
+                // Header Action Buttons (Star toggle, Edit, Delete)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = onTogglePrimary,
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (contact.isPrimary) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                            contentDescription = if (contact.isPrimary) "Remove Primary" else "Make Primary",
+                            tint = if (contact.isPrimary) VigilanceAmber else TextSecondary,
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
+
+                    IconButton(
+                        onClick = onEdit,
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = stringResource(R.string.edit_contact),
+                            tint = TextSecondary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete contact",
+                            tint = EmergencyRed,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // Action Buttons
+            // Stress-proof 56dp action buttons: Call & Message
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Button(
                     onClick = onCall,
                     colors = ButtonDefaults.buttonColors(containerColor = SafeGreen),
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.weight(1f).height(38.dp)
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(56.dp)
                 ) {
-                    Icon(Icons.Default.Call, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("CALL", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Icon(
+                        imageVector = Icons.Default.Call,
+                        contentDescription = null,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = stringResource(R.string.call_now),
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
 
-                OutlinedButton(
-                    onClick = onSms,
-                    shape = RoundedCornerShape(10.dp),
-                    modifier = Modifier.weight(1f).height(38.dp)
-                ) {
-                    Icon(Icons.Default.Message, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("SMS SOS", fontSize = 12.sp)
-                }
-
-                IconButton(
-                    onClick = onEdit,
-                    modifier = Modifier.size(38.dp)
-                ) {
-                    Icon(Icons.Default.Edit, contentDescription = "Edit", tint = TextSecondary, modifier = Modifier.size(18.dp))
-                }
-
-                IconButton(
-                    onClick = onDelete,
-                    modifier = Modifier.size(38.dp)
-                ) {
-                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = EmergencyRed, modifier = Modifier.size(18.dp))
-                }
+                SecondaryButton(
+                    text = stringResource(R.string.send_sms_btn),
+                    icon = Icons.AutoMirrored.Filled.Message,
+                    onClick = onMessage,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(56.dp)
+                )
             }
         }
     }
 }
 
 @Composable
-private fun ContactFormDialog(
+private fun AddEditContactDialog(
     initialContact: EmergencyContactEntity?,
     onDismiss: () -> Unit,
     onSave: (name: String, phone: String, relationship: String, isPrimary: Boolean) -> Unit
@@ -414,40 +455,47 @@ private fun ContactFormDialog(
     var phone by remember { mutableStateOf(initialContact?.phoneNumber ?: "") }
     var relationship by remember { mutableStateOf(initialContact?.relationship ?: "") }
     var isPrimary by remember { mutableStateOf(initialContact?.isPrimary ?: false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    var nameError by remember { mutableStateOf(false) }
+    var phoneError by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = if (initialContact != null) "Edit Contact" else "Add Emergency Contact",
-                color = TextPrimary,
-                fontWeight = FontWeight.Bold
+                text = if (initialContact != null) stringResource(R.string.edit_contact) else stringResource(R.string.add_contact),
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 22.sp
+                ),
+                color = TextPrimary
             )
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 OutlinedTextField(
                     value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Name (e.g. Mom)") },
+                    onValueChange = { name = it; nameError = false },
+                    label = { Text("Full Name", fontSize = 16.sp) },
+                    isError = nameError,
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary
+                        focusedBorderColor = PrimaryPink,
+                        focusedLabelColor = PrimaryPink
                     ),
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 OutlinedTextField(
                     value = phone,
-                    onValueChange = { phone = it },
-                    label = { Text("Phone Number") },
-                    singleLine = true,
+                    onValueChange = { phone = it; phoneError = false },
+                    label = { Text("Phone Number", fontSize = 16.sp) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    isError = phoneError,
+                    singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary
+                        focusedBorderColor = PrimaryPink,
+                        focusedLabelColor = PrimaryPink
                     ),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -455,56 +503,57 @@ private fun ContactFormDialog(
                 OutlinedTextField(
                     value = relationship,
                     onValueChange = { relationship = it },
-                    label = { Text("Relationship (Mother, Friend, etc.)") },
+                    label = { Text("Relationship (e.g. Mother, Sister)", fontSize = 16.sp) },
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary
+                        focusedBorderColor = PrimaryPink,
+                        focusedLabelColor = PrimaryPink
                     ),
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clickable { isPrimary = !isPrimary }
+                    modifier = Modifier.padding(top = 4.dp)
                 ) {
                     Checkbox(
                         checked = isPrimary,
                         onCheckedChange = { isPrimary = it },
-                        colors = CheckboxDefaults.colors(checkedColor = EmergencyRed)
+                        colors = CheckboxDefaults.colors(checkedColor = PrimaryPink)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Designate as Primary Emergency Contact",
-                        style = MaterialTheme.typography.bodyMedium,
+                        text = "Set as Primary Contact",
+                        style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp),
                         color = TextPrimary
                     )
-                }
-
-                errorMessage?.let {
-                    Text(text = it, color = EmergencyRed, style = MaterialTheme.typography.bodySmall)
                 }
             }
         },
         confirmButton = {
-            Button(
+            PrimaryButton(
+                text = "Save Contact",
                 onClick = {
-                    if (name.isBlank() || phone.isBlank()) {
-                        errorMessage = "Please enter both name and phone number."
-                        return@Button
-                    }
-                    onSave(name, phone, relationship, isPrimary)
+                    if (name.isBlank()) { nameError = true; return@PrimaryButton }
+                    if (phone.isBlank()) { phoneError = true; return@PrimaryButton }
+                    onSave(name.trim(), phone.trim(), relationship.trim(), isPrimary)
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = EmergencyRed)
-            ) {
-                Text("Save")
-            }
+                modifier = Modifier.fillMaxWidth()
+            )
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel", color = TextSecondary)
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "Cancel",
+                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp),
+                    color = TextSecondary
+                )
             }
         },
-        containerColor = Color(0xFF222222)
+        shape = RoundedCornerShape(24.dp),
+        containerColor = MaterialTheme.colorScheme.surface
     )
 }
