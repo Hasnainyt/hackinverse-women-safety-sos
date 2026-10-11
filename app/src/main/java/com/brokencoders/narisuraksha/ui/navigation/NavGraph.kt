@@ -11,12 +11,17 @@ import com.brokencoders.narisuraksha.decoy.CalculatorScreen
 import com.brokencoders.narisuraksha.decoy.DecoyViewModel
 import com.brokencoders.narisuraksha.ui.screens.AlertScreen
 import com.brokencoders.narisuraksha.ui.screens.BleDebugScreen
+import com.brokencoders.narisuraksha.ui.screens.CommunityScreen
 import com.brokencoders.narisuraksha.ui.screens.EmergencyContactsScreen
 import com.brokencoders.narisuraksha.ui.screens.HistoryScreen
 import com.brokencoders.narisuraksha.ui.screens.HomeScreen
 import com.brokencoders.narisuraksha.ui.screens.MapScreen
 import com.brokencoders.narisuraksha.ui.screens.OnboardingScreen
+import com.brokencoders.narisuraksha.ui.screens.ProfileScreen
+import com.brokencoders.narisuraksha.ui.screens.QuickRecordScreen
+import com.brokencoders.narisuraksha.ui.screens.ResourcesScreen
 import com.brokencoders.narisuraksha.ui.screens.SafeZoneScreen
+import com.brokencoders.narisuraksha.ui.screens.SafetyAlertsScreen
 import com.brokencoders.narisuraksha.ui.viewmodels.HistoryViewModel
 import com.brokencoders.narisuraksha.ui.viewmodels.MainViewModel
 
@@ -78,7 +83,12 @@ fun NariSurakshaNavGraph(
                     navController.navigate(Screen.Alert.createRoute(senderId, lat, lon, rssi)) {
                         launchSingleTop = true
                     }
-                }
+                },
+                onNavigateToSafetyAlerts = { navController.navigate(Screen.SafetyAlerts.route) { launchSingleTop = true } },
+                onNavigateToCommunity = { navController.navigate(Screen.Community.route) { launchSingleTop = true } },
+                onNavigateToResources = { navController.navigate(Screen.Resources.route) { launchSingleTop = true } },
+                onNavigateToQuickRecord = { navController.navigate(Screen.QuickRecord.route) { launchSingleTop = true } },
+                onNavigateToProfile = { navController.navigate(Screen.Profile.route) { launchSingleTop = true } }
             )
         }
 
@@ -103,6 +113,17 @@ fun NariSurakshaNavGraph(
                 rssi = rssi,
                 viewModel = mainViewModel,
                 onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.SafetyAlerts.route) {
+            SafetyAlertsScreen(
+                viewModel = mainViewModel,
+                onBack = { navController.popBackStack() },
+                onNavigateToContacts = { navController.navigate(Screen.EmergencyContacts.route) },
+                onNavigateToAlert = { senderId, lat, lon, rssi ->
+                    navController.navigate(Screen.Alert.createRoute(senderId, lat, lon, rssi))
+                }
             )
         }
 
@@ -137,6 +158,33 @@ fun NariSurakshaNavGraph(
             BleDebugScreen(
                 viewModel = mainViewModel,
                 onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.Community.route) {
+            CommunityScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.Resources.route) {
+            ResourcesScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.QuickRecord.route) {
+            QuickRecordScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Screen.Profile.route) {
+            ProfileScreen(
+                viewModel = mainViewModel,
+                onBack = { navController.popBackStack() },
+                onNavigateToContacts = { navController.navigate(Screen.EmergencyContacts.route) },
+                onNavigateToDecoy = { navController.navigate(Screen.Decoy.route) }
             )
         }
     }
