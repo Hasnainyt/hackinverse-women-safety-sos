@@ -461,10 +461,10 @@ class MainViewModel(
             val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$cleanPhone")).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
-            if (intent.resolveActivity(context.packageManager) != null) {
+            try {
                 context.startActivity(intent)
-            } else {
-                Toast.makeText(context, "No dialer app found", Toast.LENGTH_SHORT).show()
+            } catch (e: android.content.ActivityNotFoundException) {
+                Toast.makeText(context, "No dialer app found on this device", Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
             Toast.makeText(context, "Could not open dialer: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -517,10 +517,10 @@ class MainViewModel(
                 putExtra("sms_body", message)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
-            if (intent.resolveActivity(context.packageManager) != null) {
+            try {
                 context.startActivity(intent)
-            } else {
-                Toast.makeText(context, "No SMS app found", Toast.LENGTH_SHORT).show()
+            } catch (e: android.content.ActivityNotFoundException) {
+                Toast.makeText(context, "No SMS app found on this device", Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
             Toast.makeText(context, "Could not open SMS app: ${e.message}", Toast.LENGTH_SHORT).show()
