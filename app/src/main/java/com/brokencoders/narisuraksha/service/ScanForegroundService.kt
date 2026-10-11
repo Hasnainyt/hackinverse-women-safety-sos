@@ -28,20 +28,29 @@ class ScanForegroundService : Service() {
         Log.d(TAG, "ScanForegroundService onCreate")
 
         val notificationHelper = (application as NariSurakshaApp).notificationHelper
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            var fgsType = ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
-            // BLE scan results are location-derived: include location type when granted
-            // to satisfy API 34+ FGS type enforcement.
-            if (com.brokencoders.narisuraksha.core.PermissionHelper.hasLocationPermission(this)) {
-                fgsType = fgsType or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                var fgsType = ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
+                // BLE scan results are location-derived: include location type when granted
+                // to satisfy API 34+ FGS type enforcement.
+                if (com.brokencoders.narisuraksha.core.PermissionHelper.hasLocationPermission(this)) {
+                    fgsType = fgsType or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+                }
+                startForeground(
+                    Constants.NOTIFICATION_ID_SERVICE,
+                    notificationHelper.buildScanServiceNotification(),
+                    fgsType
+                )
+            } else {
+                startForeground(Constants.NOTIFICATION_ID_SERVICE, notificationHelper.buildScanServiceNotification())
             }
-            startForeground(
-                Constants.NOTIFICATION_ID_SERVICE,
-                notificationHelper.buildScanServiceNotification(),
-                fgsType
-            )
-        } else {
-            startForeground(Constants.NOTIFICATION_ID_SERVICE, notificationHelper.buildScanServiceNotification())
+        } catch (e: Exception) {
+            Log.e(TAG, "startForeground with type failed: ${e.message}", e)
+            try {
+                startForeground(Constants.NOTIFICATION_ID_SERVICE, notificationHelper.buildScanServiceNotification())
+            } catch (e2: Exception) {
+                Log.e(TAG, "Fallback startForeground also failed: ${e2.message}", e2)
+            }
         }
 
         acquireWakeLock()
