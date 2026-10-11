@@ -8,6 +8,7 @@ import android.media.Ringtone
 import android.media.RingtoneManager
 import android.net.Uri
 import android.util.Log
+import com.brokencoders.narisuraksha.R
 import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -594,12 +595,8 @@ class MainViewModel(
             if (newState) {
                 alarmRingtone?.stop()
                 alarmRingtone = null
-                val alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-                    ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
-                if (alarmUri == null) {
-                    Log.w(TAG, "Siren unavailable: no alarm/ringtone URI on this device")
-                    return
-                }
+                val alarmUri = Uri.parse("android.resource://${context.packageName}/${R.raw.siren}")
+
                 alarmRingtone = RingtoneManager.getRingtone(context, alarmUri)?.apply {
                     audioAttributes = AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_ALARM)
