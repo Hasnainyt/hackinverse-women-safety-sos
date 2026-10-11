@@ -80,6 +80,14 @@ class ScanForegroundService : Service() {
             return
         }
 
+        // WiFi mesh (primary long-range medium) listens alongside BLE.
+        // It idles silently when WiFi is unjoined — never a crash path.
+        try {
+            app.wifiMesh.start()
+        } catch (e: Exception) {
+            Log.w(TAG, "WiFi mesh listener failed: ${e.message}")
+        }
+
         try {
             bleTransport.startScanning()
         } catch (e: SecurityException) {
@@ -128,6 +136,11 @@ class ScanForegroundService : Service() {
             app.bleTransport.stopScanning()
         } catch (e: Exception) {
             Log.e(TAG, "Error stopping scan in service onDestroy", e)
+        }
+        try {
+            (application as NariSurakshaApp).wifiMesh.stop()
+        } catch (e: Exception) {
+            Log.w(TAG, "Error stopping WiFi mesh in onDestroy: ${e.message}")
         }
         wakeLock?.let {
             if (it.isHeld) it.release()

@@ -19,13 +19,10 @@ import com.brokencoders.narisuraksha.core.SosPacket
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ConcurrentLinkedQueue
 
 /**
  * Scans for nearby BLE SOS broadcasts.
@@ -35,7 +32,8 @@ import java.util.concurrent.ConcurrentLinkedQueue
 class BleScanner(
     private val context: Context,
     private val deviceIdProvider: DeviceIdProvider,
-    private val externalScope: CoroutineScope = CoroutineScope(Dispatchers.Default)
+    private val externalScope: CoroutineScope = CoroutineScope(Dispatchers.Default),
+    meshCore: MeshCore? = null
 ) {
     private val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
     private val bluetoothAdapter: BluetoothAdapter? get() = bluetoothManager?.adapter
@@ -48,25 +46,35 @@ class BleScanner(
     )
     val received: Flow<ReceivedSos> = _received.asSharedFlow()
 
+    /**
+     * Shared transport-agnostic mesh pipeline (dedup, TTL, budgets, alert
+     * rate limits). The WiFi mesh transport feeds the same instance, so a
+     * broadcast heard over both media is recognised as one event.
+     */
+    private val mesh: MeshCore = meshCore ?: MeshCore(
+        myDeviceId = deviceIdProvider.deviceId,
+        externalScope = externalScope
+    )
+
+    init {
+        mesh.emitter = { _received.tryEmit(it) }
+    }
+
     @Volatile
     var isScanning = false
         private set
 
     private var fallbackScanAttempted = false
 
-    /** RelayDedupCache with 60-second expiration */
-    val dedupCache = RelayDedupCache()
-
-    /** Budget tracker enforcing MESH_MAX_RELAYS_PER_MIN */
-    private val relayBudgetTracker = RelayBudgetTracker()
+    /** RelayDedupCache with 60-second expiration (shared with WiFi transport) */
+    val dedupCache: RelayDedupCache get() = mesh.dedupCache
 
     /** Callback invoked when a packet is scheduled for mesh relay forwarding */
-    var relayHandler: ((SosPacket) -> Unit)? = null
-
-    // Per-sender cooldown map
-    private val senderLastSeenMap = ConcurrentHashMap<Short, Long>()
-    // Sliding window of alert timestamps across all senders (global rate limit against spoofed ID rotations)
-    private val globalAlertTimestamps = ConcurrentLinkedQueue<Long>()
+    var relayHandler: ((SosPacket) -> Unit)?
+        get() = mesh.relayHandler
+        set(value) {
+            mesh.relayHandler = value
+        }
 
     private val scanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult?) {
@@ -164,55 +172,8 @@ class BleScanner(
             return
         }
 
-        val now = System.currentTimeMillis()
-
-        val decision = RelayPolicy.evaluate(
-            packet = packet,
-            myDeviceId = deviceIdProvider.deviceId,
-            cache = dedupCache,
-            canRelayBudget = { relayBudgetTracker.tryAcquire() }
-        )
-
-        if (decision != RelayDecision.IGNORE_OWN) {
-            BleDiagnosticsTracker.setLastReceivedTtl(packet.ttl)
-        }
-
-        when (decision) {
-            RelayDecision.IGNORE_OWN -> return
-
-            RelayDecision.DROP_DUPLICATE -> {
-                BleDiagnosticsTracker.incrementDuplicatesDropped()
-                BleDiagnosticsTracker.recordEvent(
-                    "NARI_BLE_DUPLICATE_DROPPED",
-                    "DROP dup sender=${packet.senderId}"
-                )
-                return
-            }
-
-            RelayDecision.RELAY_ONLY -> {
-                scheduleRelay(packet)
-                return
-            }
-
-            RelayDecision.ALERT_AND_RELAY -> {
-                scheduleRelay(packet)
-                processLocalAlert(packet, result.rssi, now)
-            }
-
-            RelayDecision.ALERT_ONLY -> {
-                processLocalAlert(packet, result.rssi, now)
-            }
-
-            RelayDecision.CONSUME_ACK_FOR_ME -> {
-                BleDiagnosticsTracker.incrementAcksReceived()
-                BleDiagnosticsTracker.recordEvent(
-                    "NARI_BLE_ACK_RECEIVED",
-                    "RX sender=${packet.senderId} ttl=${packet.ttl} rssi=${result.rssi}"
-                )
-                val receivedSos = ReceivedSos(packet = packet, rssi = result.rssi, receivedAt = now)
-                _received.tryEmit(receivedSos)
-            }
-        }
+        // Shared mesh pipeline: dedup/TTL/budget/rate-limits apply across BLE + WiFi.
+        mesh.ingest(packet, result.rssi, MeshTransport.BLE)
     }
 
     /**
@@ -220,103 +181,7 @@ class BleScanner(
      * Useful for emulator testing where Bluetooth hardware is unavailable.
      */
     fun injectSimulatedPacket(packet: SosPacket, rssi: Int = -65) {
-        val now = System.currentTimeMillis()
-        val decision = RelayPolicy.evaluate(
-            packet = packet,
-            myDeviceId = deviceIdProvider.deviceId,
-            cache = dedupCache,
-            canRelayBudget = { relayBudgetTracker.tryAcquire() }
-        )
-
-        if (decision != RelayDecision.IGNORE_OWN) {
-            BleDiagnosticsTracker.setLastReceivedTtl(packet.ttl)
-        }
-
-        when (decision) {
-            RelayDecision.IGNORE_OWN -> return
-            RelayDecision.DROP_DUPLICATE -> {
-                BleDiagnosticsTracker.incrementDuplicatesDropped()
-                BleDiagnosticsTracker.recordEvent(
-                    "NARI_BLE_DUPLICATE_DROPPED",
-                    "DROP dup sender=${packet.senderId}"
-                )
-            }
-            RelayDecision.RELAY_ONLY -> scheduleRelay(packet)
-            RelayDecision.ALERT_AND_RELAY -> {
-                scheduleRelay(packet)
-                processLocalAlert(packet, rssi, now)
-            }
-            RelayDecision.ALERT_ONLY -> processLocalAlert(packet, rssi, now)
-            RelayDecision.CONSUME_ACK_FOR_ME -> {
-                BleDiagnosticsTracker.incrementAcksReceived()
-                BleDiagnosticsTracker.recordEvent(
-                    "NARI_BLE_ACK_RECEIVED",
-                    "RX sender=${packet.senderId} ttl=${packet.ttl} rssi=$rssi"
-                )
-                val receivedSos = ReceivedSos(packet = packet, rssi = rssi, receivedAt = now)
-                _received.tryEmit(receivedSos)
-            }
-        }
-    }
-
-    private fun scheduleRelay(packet: SosPacket) {
-        val relayedPacket = packet.withDecrementedTtl()
-        val delayMs = kotlin.random.Random.nextLong(
-            Constants.MESH_RELAY_DELAY_MIN_MS,
-            Constants.MESH_RELAY_DELAY_MAX_MS + 1
-        )
-        BleDiagnosticsTracker.recordEvent("NARI_BLE_RELAY", "RELAY ttl=${relayedPacket.ttl}")
-        BleDiagnosticsTracker.incrementRelayed()
-
-        externalScope.launch {
-            delay(delayMs)
-            relayHandler?.invoke(relayedPacket)
-        }
-    }
-
-    private fun processLocalAlert(packet: SosPacket, rssi: Int, now: Long) {
-        // Clean up per-sender cooldown map periodically
-        if (senderLastSeenMap.size > 200) {
-            senderLastSeenMap.entries.removeIf { now - it.value > 180_000L }
-        }
-
-        // Rate-limiting for local distress alerts (does NOT affect mesh relay forwarding)
-        if (!packet.isAck && !packet.isTest) {
-            // Global alert rate limit
-            val windowStart = now - Constants.GLOBAL_ALERT_RATE_LIMIT_WINDOW_MS
-            while (globalAlertTimestamps.peek()?.let { it < windowStart } == true) {
-                globalAlertTimestamps.poll()
-            }
-            if (globalAlertTimestamps.size >= Constants.GLOBAL_ALERT_RATE_LIMIT_MAX_PER_MINUTE) {
-                BleDiagnosticsTracker.incrementRejectedPackets()
-                BleDiagnosticsTracker.recordEvent(
-                    "NARI_BLE_PACKET_REJECTED",
-                    "Global alert rate limit reached (${Constants.GLOBAL_ALERT_RATE_LIMIT_MAX_PER_MINUTE}/min). Suppressed #${packet.senderId}"
-                )
-                return
-            }
-
-            // Per-sender cooldown (10s)
-            val lastSeenForSender = senderLastSeenMap[packet.senderId]
-            if (lastSeenForSender != null && (now - lastSeenForSender < Constants.PACKET_RATE_LIMIT_MS)) {
-                BleDiagnosticsTracker.incrementRejectedPackets()
-                return
-            }
-
-            globalAlertTimestamps.add(now)
-            senderLastSeenMap[packet.senderId] = now
-        }
-
-        BleDiagnosticsTracker.incrementPacketsReceived()
-        val tag = if (packet.isTest) "NARI_BLE_TEST_RECEIVED" else "NARI_BLE_PACKET_RECEIVED"
-        BleDiagnosticsTracker.recordEvent(
-            tag,
-            "RX sender=${packet.senderId} ttl=${packet.ttl} rssi=$rssi"
-        )
-
-        Log.i(TAG, "Delivered SOS alert from sender ${packet.senderId}, RSSI: $rssi dBm, TTL: ${packet.ttl}")
-        val receivedSos = ReceivedSos(packet = packet, rssi = rssi, receivedAt = now)
-        _received.tryEmit(receivedSos)
+        mesh.ingest(packet, rssi, MeshTransport.BLE)
     }
 
     /**
