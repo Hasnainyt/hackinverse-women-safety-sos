@@ -149,7 +149,9 @@ No pairing. No internet. Every phone running the app is a relay node:
    - `timestamp = 0x1A2B` (Carries Phone A's sender ID as `targetSenderId`)
    - `flags = ACK`, `TTL = 4`
 4. **Intermediate phones (C, B)** see an ACK addressed to someone else (`RELAY_ONLY`): no alert, just TTL-decrement + re-broadcast toward Phone A.
-5. **Phone A** receives the ACK:
+> **No hardcoded IDs anywhere**: the ACK target is always the victim's live sender ID from the received packet, and responder IDs are the responders' live device IDs.
+
+5. **Phone A** receives the ACK (over BLE *or* WiFi — the responder transmits 3 bursts on **both** media, and intermediate phones relay foreign ACKs on both):
    - Validates `targetSenderId == myDeviceId`.
    - Deduplicates responder: adds `0x5C6D` to unique `Set<Short>`.
    - Increments responder count (`0 -> 1`).

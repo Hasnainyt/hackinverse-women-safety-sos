@@ -4,8 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.hardware.camera2.CameraManager
 import android.media.AudioAttributes
-import android.media.Ringtone
-import android.media.RingtoneManager
+import android.media.MediaPlayer
 import android.net.Uri
 import android.util.Log
 import com.brokencoders.narisuraksha.R
@@ -113,6 +112,9 @@ class MainViewModel(
     // SOS packets so the BLE advertising queue doesn't get flooded with identical ACKs.
     private val recentAckTargets = mutableMapOf<Short, Long>()
 
+    // In-flight ACK repeat bursts per target; cancelled when the SOS epoch ends.
+    private val ackRepeatJobs = mutableMapOf<Short, kotlinx.coroutines.Job>()
+
     private val _isFlashlightOn = MutableStateFlow(false)
     val isFlashlightOn: StateFlow<Boolean> = _isFlashlightOn.asStateFlow()
 
@@ -122,7 +124,7 @@ class MainViewModel(
     private val _isTestBroadcasting = MutableStateFlow(false)
     val isTestBroadcasting: StateFlow<Boolean> = _isTestBroadcasting.asStateFlow()
 
-    private var alarmRingtone: Ringtone? = null
+    private var sirenPlayer: MediaPlayer? = null
 
     init {
         // Collect SOS confirmation to launch SosForegroundService
@@ -238,18 +240,21 @@ class MainViewModel(
     fun triggerSos() {
         acknowledgedResponders.clear()
         _responderAckCount.value = 0
+        cancelAckRepeats()
         sosManager.triggerSos()
     }
 
     fun cancelCountdown() {
         acknowledgedResponders.clear()
         _responderAckCount.value = 0
+        cancelAckRepeats()
         sosManager.cancelCountdown()
     }
 
     fun stopSos() {
         acknowledgedResponders.clear()
         _responderAckCount.value = 0
+        cancelAckRepeats()
         sosManager.stopSos()
         SosForegroundService.stop(context)
 
@@ -279,6 +284,15 @@ class MainViewModel(
      * Routed through [bleAdvertiser] (not bleTransport) so the SOS-priority guard
      * applies — an active SOS broadcast will NOT be replaced by this ACK.
      */
+    /**
+     * Sends an ACK beacon addressed to [targetSenderId] — the victim's LIVE
+     * device ID from the received packet, never a hardcoded value.
+     *
+     * Transmits on BOTH media (BLE advertiser + WiFi broadcast) in
+     * [ACK_BURSTS] bursts spaced [ACK_BURST_GAP_MS] apart: a single
+     * fire-and-forget burst is easily lost on real radios, while the victim
+     * deduplicates repeats so extra bursts cost nothing.
+     */
     fun sendResponderAck(targetSenderId: Short) {
         val now = System.currentTimeMillis()
 
@@ -296,7 +310,20 @@ class MainViewModel(
             // ignore concurrent pruning failures; map is best-effort dedup
         }
 
-        Log.i(TAG, "Sending responder ACK beacon targeting sender #$targetSenderId")
+        ackRepeatJobs[targetSenderId]?.cancel()
+        ackRepeatJobs[targetSenderId] = viewModelScope.launch {
+            repeat(ACK_BURSTS) { burst ->
+                if (burst > 0) {
+                    kotlinx.coroutines.delay(ACK_BURST_GAP_MS)
+                }
+                transmitAckBurst(targetSenderId, burst)
+            }
+            ackRepeatJobs.remove(targetSenderId)
+        }
+    }
+
+    private fun transmitAckBurst(targetSenderId: Short, burst: Int) {
+        Log.i(TAG, "Sending responder ACK beacon targeting sender #$targetSenderId (burst ${burst + 1}/$ACK_BURSTS)")
 
         val ackPacket = SosPacket.create(
             senderId = deviceIdProvider.deviceId,
@@ -306,20 +333,33 @@ class MainViewModel(
             targetSenderId = targetSenderId
         )
 
+        var sent = false
         try {
             bleAdvertiser.startAdvertising(ackPacket, timeoutMs = ACK_ADVERTISE_TIMEOUT_MS)
+            sent = true
         } catch (e: SecurityException) {
-            Log.e(TAG, "ACK not sent: missing BLUETOOTH_ADVERTISE permission", e)
-            return
+            Log.e(TAG, "ACK not sent on BLE: missing BLUETOOTH_ADVERTISE permission", e)
         } catch (e: IllegalStateException) {
-            Log.e(TAG, "ACK not sent: Bluetooth off", e)
-            return
+            Log.e(TAG, "ACK not sent on BLE: Bluetooth off", e)
+        }
+        try {
+            wifiMesh?.broadcast(ackPacket)
+            sent = true
+        } catch (e: Exception) {
+            Log.w(TAG, "ACK not sent on WiFi: ${e.message}")
         }
 
-        BleDiagnosticsTracker.recordEvent(
-            "NARI_BLE_ACK_SENT",
-            "ACK queued/dispatched for target #$targetSenderId"
-        )
+        if (sent) {
+            BleDiagnosticsTracker.recordEvent(
+                "NARI_BLE_ACK_SENT",
+                "ACK burst ${burst + 1}/$ACK_BURSTS queued/dispatched for target #$targetSenderId (BLE+WiFi)"
+            )
+        }
+    }
+
+    private fun cancelAckRepeats() {
+        ackRepeatJobs.values.forEach { it.cancel() }
+        ackRepeatJobs.clear()
     }
 
     /**
@@ -402,7 +442,7 @@ class MainViewModel(
      * Safe for debug environments where a second physical transmitter is unavailable.
      */
     fun injectSimulatedSosForTesting(
-        senderId: Short = 999,
+        senderId: Short = ((deviceIdProvider.deviceId.toInt() + 101) and 0x7FFF).toShort(),
         lat: Float = 28.6139f,
         lon: Float = 77.2090f,
         rssi: Int = -62
@@ -628,25 +668,50 @@ class MainViewModel(
         }
     }
 
+    /**
+     * Deterrent siren: loops the bundled siren tone INFINITELY (alarm usage,
+     * max volume) until the user toggles it off, taps "I'm Safe", or the
+     * ViewModel is cleared. Ringtone.play() cannot loop, hence MediaPlayer.
+     */
     fun toggleSiren() {
         try {
             val newState = !_isSirenOn.value
             if (newState) {
-                alarmRingtone?.stop()
-                alarmRingtone = null
-                val alarmUri = Uri.parse("android.resource://${context.packageName}/${R.raw.siren}")
-
-                alarmRingtone = RingtoneManager.getRingtone(context, alarmUri)?.apply {
-                    audioAttributes = AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ALARM)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build()
-                    play()
+                stopSirenPlayer()
+                val player = MediaPlayer.create(context, R.raw.siren)
+                if (player == null) {
+                    Log.w(TAG, "Siren unavailable: could not load siren resource")
+                    return
                 }
+                try {
+                    player.setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_ALARM)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build()
+                    )
+                    player.setVolume(1.0f, 1.0f)
+                    player.isLooping = true
+                    player.setOnErrorListener { _, what, extra ->
+                        Log.e(TAG, "Siren player error what=$what extra=$extra")
+                        stopSirenPlayer()
+                        _isSirenOn.value = false
+                        true
+                    }
+                    player.start()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Siren start failed", e)
+                    try {
+                        player.release()
+                    } catch (_: Exception) {
+                    }
+                    return
+                }
+                sirenPlayer = player
                 _isSirenOn.value = true
+                Log.i(TAG, "Siren looping (user-stoppable)")
             } else {
-                alarmRingtone?.stop()
-                alarmRingtone = null
+                stopSirenPlayer()
                 _isSirenOn.value = false
             }
         } catch (e: Exception) {
@@ -654,15 +719,24 @@ class MainViewModel(
         }
     }
 
+    private fun stopSirenPlayer() {
+        try {
+            try {
+                sirenPlayer?.stop()
+            } catch (_: IllegalStateException) {
+                // Never started — release only.
+            }
+            sirenPlayer?.release()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error stopping siren player", e)
+        } finally {
+            sirenPlayer = null
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
-        try {
-            alarmRingtone?.stop()
-        } catch (_: Exception) {
-            // ignore stop failures during teardown
-        } finally {
-            alarmRingtone = null
-        }
+        stopSirenPlayer()
         try {
             val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as? CameraManager
             if (_isFlashlightOn.value && cameraManager != null) {
@@ -700,6 +774,12 @@ class MainViewModel(
 
         /** Skip sending another ACK to the same target within this window. */
         private const val ACK_COOLDOWN_MS = 3_000L
+
+        /** ACK transmit bursts per responder tap (lossy radios need repeats). */
+        private const val ACK_BURSTS = 3
+
+        /** Gap between ACK bursts; exceeds ACK_COOLDOWN so bursts never self-skip. */
+        private const val ACK_BURST_GAP_MS = 3_500L
 
         fun provideFactory(
             context: Context,

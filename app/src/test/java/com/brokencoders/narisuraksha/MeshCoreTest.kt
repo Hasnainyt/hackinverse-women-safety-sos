@@ -122,6 +122,47 @@ class MeshCoreTest {
     }
 
     @Test
+    fun testWifiAckToMeConsumed() = testScope.runTest {
+        // PhoneB's ACK arrives over WiFi (no RSSI on WiFi): victim consumes it.
+        val ack = SosPacket.create(
+            senderId = 55,
+            lat = null,
+            lon = null,
+            isAck = true,
+            targetSenderId = 7,
+            ttl = 4
+        )
+        val outcome = core.ingest(ack, rssi = Int.MIN_VALUE, MeshTransport.WIFI)
+        runCurrent()
+
+        assertTrue(outcome.alerted)
+        assertFalse(outcome.relayed)
+        assertEquals(1, emitted.size)
+        assertEquals(com.brokencoders.narisuraksha.ble.MeshTransport.WIFI, emitted[0].transport)
+        assertTrue(relayed.isEmpty())
+    }
+
+    @Test
+    fun testForeignAckRelayedOverEitherMedium() = testScope.runTest {
+        // ACK for another victim heard over WiFi: forward silently, no alert.
+        val ack = SosPacket.create(
+            senderId = 55,
+            lat = null,
+            lon = null,
+            isAck = true,
+            targetSenderId = 999,
+            ttl = 2
+        )
+        val outcome = core.ingest(ack, rssi = Int.MIN_VALUE, MeshTransport.WIFI)
+        runCurrent()
+
+        assertFalse(outcome.alerted)
+        assertTrue(outcome.relayed)
+        assertTrue(emitted.isEmpty())
+        assertEquals(1, relayed[0].ttl)
+    }
+
+    @Test
     fun testOwnPacketIgnored() = testScope.runTest {
         val outcome = core.ingest(sos(senderId = 7), rssi = -50, MeshTransport.BLE)
         runCurrent()
