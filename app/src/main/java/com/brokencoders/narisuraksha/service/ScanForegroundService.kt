@@ -96,6 +96,13 @@ class ScanForegroundService : Service() {
 
         serviceScope.launch {
             bleTransport.received.collectLatest { receivedSos ->
+                // ACKs are confirmations for a victim, not new distress calls.
+                // Do not show an incoming SOS alert notification for an ACK.
+                if (receivedSos.packet.isAck) {
+                    Log.d(TAG, "Ignoring incoming ACK packet in ScanForegroundService notification dispatcher")
+                    return@collectLatest
+                }
+
                 Log.i(TAG, "Handling received SOS event from sender: ${receivedSos.packet.senderId}")
 
                 // Save to Room Database

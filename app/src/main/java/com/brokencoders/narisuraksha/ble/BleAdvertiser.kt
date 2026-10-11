@@ -274,7 +274,11 @@ class BleAdvertiser(
             packet.isAck -> AdvPriority.OWN_ACK
             else -> AdvPriority.OWN_SOS
         }
-        val duration = if (packet.isAck) Constants.MESH_RELAY_ADVERTISE_MS else timeoutMs
+        val duration = if (packet.isAck) {
+            if (timeoutMs != Constants.SOS_ADVERTISE_TIMEOUT_MS) timeoutMs else Constants.MESH_RELAY_ADVERTISE_MS
+        } else {
+            timeoutMs
+        }
         enqueueOrExecute(QueuedAdv(packet, priority, duration))
     }
 
