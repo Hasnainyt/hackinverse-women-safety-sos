@@ -115,6 +115,10 @@ class MeshCore(
                     "${tag}_ACK_RECEIVED",
                     "RX sender=${packet.senderId} ttl=${packet.ttl} rssi=$rssi"
                 )
+                // Record the distinct responder in the process-wide registry so
+                // the acknowledged count survives activity recreation and does
+                // not depend on a MainViewModel existing.
+                ResponderAckRegistry.recordAck(packet.senderId)
                 emitter?.invoke(ReceivedSos(packet = packet, rssi = rssi, receivedAt = now, transport = transport))
                 MeshOutcome(alerted = true, relayed = false)
             }

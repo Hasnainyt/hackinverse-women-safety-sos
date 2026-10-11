@@ -280,13 +280,15 @@ class BleScanner(
 
     @SuppressLint("MissingPermission")
     private fun startScanWithFilters() {
-        // Safe filters: only Service UUIDs (never empty manufacturer data).
-        // Deduplicated: SOS_SERVICE_UUID and SOS_LEGACY_128_UUID currently map to
-        // the same 0xFDE1 value, so registering both would waste a scarce HW slot.
+        // The advertiser ONLY emits Service Data (AD type 0x16) under SOS_SERVICE_UUID.
+        // A ScanFilter.setServiceUuid() matches against the Service-UUID-LIST ADs
+        // (0x03/0x07), which our advertisements do NOT carry — so a UUID filter
+        // matches nothing on devices where the filter runs in software, silently
+        // killing reception. Use setServiceData(uuid, null) which matches the
+        // actual AD structure we transmit (any payload under this service-data UUID).
         val filters = listOf(
-            ScanFilter.Builder().setServiceUuid(Constants.SOS_PARCEL_UUID).build(),
-            ScanFilter.Builder().setServiceUuid(ParcelUuid(Constants.SOS_LEGACY_128_UUID)).build()
-        ).distinctBy { it.serviceUuid }
+            ScanFilter.Builder().setServiceData(Constants.SOS_PARCEL_UUID, null).build()
+        )
 
         val settingsBuilder = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_BALANCED)
@@ -301,8 +303,8 @@ class BleScanner(
             scanner?.startScan(filters, settingsBuilder.build(), scanCallback)
             isScanning = true
             BleDiagnosticsTracker.setScanning(true)
-            BleDiagnosticsTracker.recordEvent("NARI_BLE_SCAN_START", "BLE Scanner started with Service UUID filters (FDE1)")
-            Log.i(TAG, "BLE Scanner started with multi-payload filters")
+            BleDiagnosticsTracker.recordEvent("NARI_BLE_SCAN_START", "BLE Scanner started with Service-Data UUID filter (FDE1)")
+            Log.i(TAG, "BLE Scanner started with service-data filter")
         } catch (e: Exception) {
             BleDiagnosticsTracker.recordEvent("NARI_BLE_SCAN_FAILURE", "Hardware filter start failed: ${e.message}. Falling back...", isError = true)
             fallbackScanAttempted = true

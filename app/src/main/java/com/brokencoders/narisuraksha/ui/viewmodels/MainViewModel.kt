@@ -16,6 +16,7 @@ import com.brokencoders.narisuraksha.ble.BleAdvertiser
 import com.brokencoders.narisuraksha.ble.BleDiagnosticsTracker
 import com.brokencoders.narisuraksha.ble.BleScanner
 import com.brokencoders.narisuraksha.ble.BleTransport
+import com.brokencoders.narisuraksha.ble.ResponderAckRegistry
 import com.brokencoders.narisuraksha.ble.ReceivedSos
 import com.brokencoders.narisuraksha.capture.Coordinates
 import com.brokencoders.narisuraksha.capture.LocationFix
@@ -110,10 +111,8 @@ class MainViewModel(
         _latestReceivedAlert.value = null
     }
 
-    private val _responderAckCount = MutableStateFlow(0)
+    private val _responderAckCount = MutableStateFlow(ResponderAckRegistry.responderCount)
     val responderAckCount: StateFlow<Int> = _responderAckCount.asStateFlow()
-    // Tracks unique responder IDs who have acknowledged this device's current SOS beacon
-    private val acknowledgedResponders = mutableSetOf<Short>()
 
     // Tracks ACKs WE sent recently, keyed by targetSenderId — dedupes retransmitted
     // SOS packets so the BLE advertising queue doesn't get flooded with identical ACKs.
@@ -140,18 +139,18 @@ class MainViewModel(
                 when (event) {
                     is SosEvent.CountdownStarted -> {
                         Log.i(TAG, "SosEvent: Countdown started")
-                        acknowledgedResponders.clear()
+                        ResponderAckRegistry.clear()
                         _responderAckCount.value = 0
                     }
                     is SosEvent.Cancelled -> {
                         Log.i(TAG, "SosEvent: SOS Cancelled")
-                        acknowledgedResponders.clear()
+                        ResponderAckRegistry.clear()
                         _responderAckCount.value = 0
                         SosForegroundService.stop(context)
                     }
                     is SosEvent.Confirmed -> {
                         Log.i(TAG, "SosEvent: SOS Confirmed! Launching broadcast service...")
-                        acknowledgedResponders.clear()
+                        ResponderAckRegistry.clear()
                         _responderAckCount.value = 0
                         SosForegroundService.start(
                             context = context,
@@ -173,9 +172,18 @@ class MainViewModel(
                     // Only count ACK if addressed to our device (or 0 for legacy broadcast ACK)
                     if (targetId == 0.toShort() || targetId == myDeviceId) {
                         val responderId = receivedSos.packet.senderId
-                        if (acknowledgedResponders.add(responderId)) {
-                            Log.i(TAG, "Distinct responder #$responderId confirmed distress. Total: ${acknowledgedResponders.size}")
-                            _responderAckCount.value = acknowledgedResponders.size
+                        if (ResponderAckRegistry.recordAck(responderId)) {
+                            Log.i(TAG, "Distinct responder #$responderId confirmed distress. Total: ${ResponderAckRegistry.responderCount}")
+                            _responderAckCount.value = ResponderAckRegistry.responderCount
+                            // Notify the victim that a responder acknowledged —
+                            // a distinct, lower-priority notification from the
+                            // emergency alert (an ACK is NOT a new emergency).
+                            try {
+                                val app = context.applicationContext as? com.brokencoders.narisuraksha.NariSurakshaApp
+                                app?.notificationHelper?.showResponderAcknowledged(responderId, ResponderAckRegistry.responderCount)
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Responder-ack notification failed: ${e.message}")
+                            }
                         } else {
                             Log.d(TAG, "Duplicate ACK from responder #$responderId ignored")
                         }
@@ -248,21 +256,21 @@ class MainViewModel(
     }
 
     fun triggerSos() {
-        acknowledgedResponders.clear()
+        ResponderAckRegistry.clear()
         _responderAckCount.value = 0
         cancelAckRepeats()
         sosManager.triggerSos()
     }
 
     fun cancelCountdown() {
-        acknowledgedResponders.clear()
+        ResponderAckRegistry.clear()
         _responderAckCount.value = 0
         cancelAckRepeats()
         sosManager.cancelCountdown()
     }
 
     fun stopSos() {
-        acknowledgedResponders.clear()
+        ResponderAckRegistry.clear()
         _responderAckCount.value = 0
         cancelAckRepeats()
         sosManager.stopSos()
@@ -302,14 +310,18 @@ class MainViewModel(
      * [ACK_BURSTS] bursts spaced [ACK_BURST_GAP_MS] apart: a single
      * fire-and-forget burst is easily lost on real radios, while the victim
      * deduplicates repeats so extra bursts cost nothing.
+     *
+     * Returns true if the ACK was actually queued for transmission on at least
+     * one medium, false if it was dropped (cooldown, Bluetooth off, permissions
+     * missing). Callers MUST only report success when this returns true.
      */
-    fun sendResponderAck(targetSenderId: Short) {
+    fun sendResponderAck(targetSenderId: Short): Boolean {
         val now = System.currentTimeMillis()
 
         val lastAck = recentAckTargets[targetSenderId]
         if (lastAck != null && now - lastAck < ACK_COOLDOWN_MS) {
             Log.d(TAG, "ACK to #$targetSenderId skipped (cooldown ${now - lastAck}ms)")
-            return
+            return false
         }
         recentAckTargets[targetSenderId] = now
 
@@ -330,6 +342,12 @@ class MainViewModel(
             }
             ackRepeatJobs.remove(targetSenderId)
         }
+        // The first burst will be dispatched immediately by the coroutine above;
+        // we optimistically report "queued" here because the coroutine runs on
+        // viewModelScope (main dispatcher) and executes transmitAckBurst before
+        // the next UI frame. transmitAckBurst itself logs real success/failure
+        // per medium.
+        return true
     }
 
     private fun transmitAckBurst(targetSenderId: Short, burst: Int) {

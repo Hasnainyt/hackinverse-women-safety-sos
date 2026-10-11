@@ -102,6 +102,15 @@ class ScanForegroundService : Service() {
                     Log.d(TAG, "TEST beacon from sender ${receivedSos.packet.senderId} kept out of DB/notifications")
                     return@collectLatest
                 }
+                // ACK packets are responder acknowledgements, NOT new SOS emergencies.
+                // Persisting them as TYPE_RECEIVED and firing the heads-up alert would
+                // mislabel an acknowledgement as a fresh distress beacon and pollute
+                // the history DB. ACKs are surfaced through MainViewModel.responderAckCount
+                // (and a dedicated "responder acknowledged" notification) instead.
+                if (receivedSos.packet.isAck) {
+                    Log.i(TAG, "ACK from responder #${receivedSos.packet.senderId} for target #${receivedSos.packet.targetSenderId} — not a new SOS, skipping DB insert/emergency notification")
+                    return@collectLatest
+                }
                 Log.i(TAG, "Handling received SOS event from sender: ${receivedSos.packet.senderId}")
 
                 // Save to Room Database
@@ -128,6 +137,22 @@ class ScanForegroundService : Service() {
         if (intent?.action == ACTION_STOP_SCAN) {
             stopSelf()
             return START_NOT_STICKY
+        }
+        // Re-ensure the transport-level scan is active when the service is
+        // (re)started. onCreate already calls startScanning() (which also
+        // launches the received-event collector); here we only restart the
+        // BLE/WiFi transport scan so a subsequent start() delivery (e.g. from
+        // MainActivity.onResume or ensureGuardianScanActive) revives a dead
+        // scan without launching a duplicate collector. BleScanner.startScanning
+        // is a no-op if already scanning.
+        try {
+            val app = application as NariSurakshaApp
+            if (com.brokencoders.narisuraksha.core.PermissionHelper.hasBluetoothPermissions(this)) {
+                app.bleTransport.startScanning()
+            }
+            app.wifiMesh.start()
+        } catch (e: Exception) {
+            Log.w(TAG, "Scan restart from onStartCommand failed: ${e.message}")
         }
         return START_STICKY
     }

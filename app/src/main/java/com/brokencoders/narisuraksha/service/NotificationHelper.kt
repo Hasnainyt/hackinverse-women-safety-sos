@@ -198,4 +198,56 @@ class NotificationHelper(private val context: Context) {
             // notification permission fallback
         }
     }
+
+    /**
+     * Shows a "responder acknowledged" notification on the victim's device when
+     * a nearby responder confirms they are responding to the SOS. This is a
+     * distinct, lower-priority notification from the emergency alert — an
+     * acknowledgement is NOT a new emergency and must not be labeled as one.
+     */
+    fun showResponderAcknowledged(responderId: Short, totalResponders: Int) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            val granted = androidx.core.content.ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.POST_NOTIFICATIONS
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            if (!granted) {
+                android.util.Log.w("NotificationHelper", "POST_NOTIFICATIONS not granted; skipping responder-ack notification")
+                return
+            }
+        }
+
+        val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
+            flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pendingIntent = android.app.PendingIntent.getActivity(
+            context,
+            (responderId.toInt() and 0xFFFF) + 1000,
+            launchIntent,
+            android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val title = if (totalResponders == 1) {
+            "✅ 1 Responder Acknowledged"
+        } else {
+            "✅ $totalResponders Responders Acknowledged"
+        }
+        val text = "A nearby responder confirmed they are responding to your SOS. This does not guarantee emergency services have been contacted."
+
+        val builder = NotificationCompat.Builder(context, Constants.CHANNEL_ALERT_ID)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText("A nearby responder (device #$responderId) confirmed they are responding to your SOS.\n\n$text"))
+            .setSmallIcon(R.drawable.ic_calculator_launcher)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+
+        val notificationId = Constants.NOTIFICATION_ID_ALERT_BASE + 900 + (responderId.toInt() and 0xFF)
+        try {
+            NotificationManagerCompat.from(context).notify(notificationId, builder.build())
+        } catch (e: SecurityException) {
+            // notification permission fallback
+        }
+    }
 }

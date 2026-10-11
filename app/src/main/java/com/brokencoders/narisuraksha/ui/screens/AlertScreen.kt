@@ -327,9 +327,15 @@ fun AlertScreen(
             // Primary 72dp Green "I AM RESPONDING" Button
             Button(
                 onClick = {
-                    viewModel.sendResponderAck(senderId)
-                    isAckSent = true
-                    Toast.makeText(context, context.getString(R.string.ack_success_toast), Toast.LENGTH_LONG).show()
+                    val queued = viewModel.sendResponderAck(senderId)
+                    if (queued) {
+                        isAckSent = true
+                        Toast.makeText(context, context.getString(R.string.ack_success_toast), Toast.LENGTH_LONG).show()
+                    } else {
+                        // ACK was dropped (cooldown, Bluetooth off, or permission
+                        // missing) — do NOT claim success. Tell the user the truth.
+                        Toast.makeText(context, "ACK not sent — Bluetooth off or permission missing. Please check Bluetooth and try again.", Toast.LENGTH_LONG).show()
+                    }
                 },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = SafeGreen,

@@ -60,6 +60,9 @@ class WifiMeshTransport(
     /**
      * Starts listening for WiFi mesh broadcasts. No-op (stays idle) when WiFi
      * is unavailable — BLE remains the active medium. Safe to call repeatedly.
+     * Call [forceRecheck] when you know the WiFi state has changed (e.g. after
+     * the system reports a network join) to trigger a fresh check without
+     * restarting the app.
      */
     fun start() {
         if (listenJob?.isActive == true) return
@@ -71,6 +74,26 @@ class WifiMeshTransport(
         listenJob = scope.launch {
             runListener()
         }
+    }
+
+    /**
+     * Forces a fresh WiFi join check. Use this when you know the WiFi state has
+     * changed (e.g. the system just connected to a new network) without requiring
+     * an app restart. Safe to call from Activity.onResume() or a Connectivity
+     * callback.
+     */
+    fun forceRecheck() {
+        if (!isWifiJoined()) {
+            Log.i(TAG, "WiFi recheck: network no longer joined — keeping BLE mesh active")
+            _isActive.value = false
+            return
+        }
+        // WiFi is now joined: start the listener
+        listenJob = scope.launch {
+            runListener()
+        }
+        _isActive.value = true
+        Log.i(TAG, "WiFi recheck: network joined — mesh listener started")
     }
 
     fun stop() {
