@@ -4,8 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.hardware.camera2.CameraManager
 import android.media.AudioAttributes
-import android.media.Ringtone
-import android.media.RingtoneManager
+import android.media.MediaPlayer
 import android.net.Uri
 import android.util.Log
 import com.brokencoders.narisuraksha.R
@@ -122,7 +121,7 @@ class MainViewModel(
     private val _isTestBroadcasting = MutableStateFlow(false)
     val isTestBroadcasting: StateFlow<Boolean> = _isTestBroadcasting.asStateFlow()
 
-    private var alarmRingtone: Ringtone? = null
+    private var sirenPlayer: MediaPlayer? = null
 
     init {
         // Collect SOS confirmation to launch SosForegroundService
@@ -628,25 +627,50 @@ class MainViewModel(
         }
     }
 
+    /**
+     * Deterrent siren: loops the bundled siren tone INFINITELY (alarm usage,
+     * max volume) until the user toggles it off, taps "I'm Safe", or the
+     * ViewModel is cleared. Ringtone.play() cannot loop, hence MediaPlayer.
+     */
     fun toggleSiren() {
         try {
             val newState = !_isSirenOn.value
             if (newState) {
-                alarmRingtone?.stop()
-                alarmRingtone = null
-                val alarmUri = Uri.parse("android.resource://${context.packageName}/${R.raw.siren}")
-
-                alarmRingtone = RingtoneManager.getRingtone(context, alarmUri)?.apply {
-                    audioAttributes = AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ALARM)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build()
-                    play()
+                stopSirenPlayer()
+                val player = MediaPlayer.create(context, R.raw.siren)
+                if (player == null) {
+                    Log.w(TAG, "Siren unavailable: could not load siren resource")
+                    return
                 }
+                try {
+                    player.setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_ALARM)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build()
+                    )
+                    player.setVolume(1.0f, 1.0f)
+                    player.isLooping = true
+                    player.setOnErrorListener { _, what, extra ->
+                        Log.e(TAG, "Siren player error what=$what extra=$extra")
+                        stopSirenPlayer()
+                        _isSirenOn.value = false
+                        true
+                    }
+                    player.start()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Siren start failed", e)
+                    try {
+                        player.release()
+                    } catch (_: Exception) {
+                    }
+                    return
+                }
+                sirenPlayer = player
                 _isSirenOn.value = true
+                Log.i(TAG, "Siren looping (user-stoppable)")
             } else {
-                alarmRingtone?.stop()
-                alarmRingtone = null
+                stopSirenPlayer()
                 _isSirenOn.value = false
             }
         } catch (e: Exception) {
@@ -654,15 +678,24 @@ class MainViewModel(
         }
     }
 
+    private fun stopSirenPlayer() {
+        try {
+            try {
+                sirenPlayer?.stop()
+            } catch (_: IllegalStateException) {
+                // Never started — release only.
+            }
+            sirenPlayer?.release()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error stopping siren player", e)
+        } finally {
+            sirenPlayer = null
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
-        try {
-            alarmRingtone?.stop()
-        } catch (_: Exception) {
-            // ignore stop failures during teardown
-        } finally {
-            alarmRingtone = null
-        }
+        stopSirenPlayer()
         try {
             val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as? CameraManager
             if (_isFlashlightOn.value && cameraManager != null) {
