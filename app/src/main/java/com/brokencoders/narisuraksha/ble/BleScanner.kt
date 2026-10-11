@@ -178,7 +178,10 @@ class BleScanner(
 
     /**
      * Injects a simulated packet directly into the scanner pipeline.
-     * Useful for emulator testing where Bluetooth hardware is unavailable.
+     * Emulator development ONLY: must never be reachable from production UI —
+     * injected SOS packets schedule REAL mesh relays and REAL alerts.
+     * For safe on-air demos use FLAG_TEST broadcasts (never relayed, never
+     * bannered) instead.
      */
     fun injectSimulatedPacket(packet: SosPacket, rssi: Int = -65) {
         mesh.ingest(packet, rssi, MeshTransport.BLE)

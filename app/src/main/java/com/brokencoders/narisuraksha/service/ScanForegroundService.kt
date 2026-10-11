@@ -96,6 +96,12 @@ class ScanForegroundService : Service() {
 
         serviceScope.launch {
             bleTransport.received.collectLatest { receivedSos ->
+                // Non-emergency TEST beacons stay in diagnostics only: persisting
+                // them or notifying would manufacture fake SOS emergencies.
+                if (receivedSos.packet.isTest) {
+                    Log.d(TAG, "TEST beacon from sender ${receivedSos.packet.senderId} kept out of DB/notifications")
+                    return@collectLatest
+                }
                 Log.i(TAG, "Handling received SOS event from sender: ${receivedSos.packet.senderId}")
 
                 // Save to Room Database

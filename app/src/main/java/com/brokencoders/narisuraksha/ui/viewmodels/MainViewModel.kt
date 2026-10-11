@@ -98,6 +98,13 @@ class MainViewModel(
     private val _latestReceivedAlert = MutableStateFlow<ReceivedSos?>(null)
     val latestReceivedAlert: StateFlow<ReceivedSos?> = _latestReceivedAlert.asStateFlow()
 
+    /**
+     * Latest non-emergency TEST beacon (diagnostics only). TEST packets never
+     * touch [_latestReceivedAlert], the DB, or notifications — no fake SOS.
+     */
+    private val _lastTestBeacon = MutableStateFlow<ReceivedSos?>(null)
+    val lastTestBeacon: StateFlow<ReceivedSos?> = _lastTestBeacon.asStateFlow()
+
     /** Consumes the sticky incoming-alert banner after navigation to Alert. */
     fun clearReceivedAlert() {
         _latestReceivedAlert.value = null
@@ -175,6 +182,9 @@ class MainViewModel(
                     } else {
                         Log.d(TAG, "Ignoring ACK intended for sender #$targetId (my deviceId is #$myDeviceId)")
                     }
+                } else if (receivedSos.packet.isTest) {
+                    _lastTestBeacon.value = receivedSos
+                    Log.d(TAG, "TEST beacon parked on diagnostics flow (no banner, no alert)")
                 } else {
                     _latestReceivedAlert.value = receivedSos
                 }
@@ -419,42 +429,6 @@ class MainViewModel(
     fun toggleDebugScanMode(enabled: Boolean) {
         bleDiagnostics.setDebugScanMode(enabled)
         bleScanner.restartScanning()
-    }
-
-    /**
-     * Injects a synthetic incoming SOS packet for emulator validation.
-     */
-    fun injectSimulatedSosPacket() {
-        val simulatedSenderId = ((deviceIdProvider.deviceId.toInt() + 101) and 0x7FFF).toShort()
-        val packet = SosPacket(
-            senderId = simulatedSenderId,
-            timestamp = (System.currentTimeMillis() / 1000).toInt(),
-            lat = 28.6139f,
-            lon = 77.2090f,
-            flags = SosPacket.FLAG_SOS.toByte(),
-            ttl = 3 // 1 hop via mesh relay
-        )
-        bleScanner.injectSimulatedPacket(packet)
-    }
-
-    /**
-     * Injects a simulated SOS packet into the UI and BLE diagnostics for emulator/demo validation.
-     * Safe for debug environments where a second physical transmitter is unavailable.
-     */
-    fun injectSimulatedSosForTesting(
-        senderId: Short = ((deviceIdProvider.deviceId.toInt() + 101) and 0x7FFF).toShort(),
-        lat: Float = 28.6139f,
-        lon: Float = 77.2090f,
-        rssi: Int = -62
-    ) {
-        val packet = SosPacket.create(
-            senderId = senderId,
-            lat = lat.toDouble(),
-            lon = lon.toDouble()
-        )
-        _latestReceivedAlert.value = ReceivedSos(packet = packet, rssi = rssi, receivedAt = System.currentTimeMillis())
-        bleDiagnostics.recordEvent("SIMULATION", "Injected simulated SOS beacon from sender #$senderId (RSSI: $rssi dBm)")
-        bleDiagnostics.incrementPacketsReceived()
     }
 
     // ==========================================
